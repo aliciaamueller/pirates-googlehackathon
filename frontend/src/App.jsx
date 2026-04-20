@@ -1,5 +1,96 @@
 import { useState, useEffect, useRef } from "react";
+import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps";
 import { supabase } from "./supabase";
+
+const MAPS_API_KEY = import.meta.env.VITE_MAPS_API_KEY;
+
+// ─── PIRATE MAP THEME ─────────────────────────────────────────────
+const PIRATE_MAP_STYLE = [
+  { elementType:"geometry", stylers:[{color:"#1a1a2e"}] },
+  { elementType:"labels.text.fill", stylers:[{color:"#D4A96A"}] },
+  { elementType:"labels.text.stroke", stylers:[{color:"#1a1a2e"}] },
+  { featureType:"administrative", elementType:"geometry", stylers:[{color:"#2d2d4e"}] },
+  { featureType:"administrative.country", elementType:"labels.text.fill", stylers:[{color:"#D4A96A"}] },
+  { featureType:"administrative.locality", elementType:"labels.text.fill", stylers:[{color:"#f0d090"}] },
+  { featureType:"poi", elementType:"labels.text.fill", stylers:[{color:"#D4A96A"}] },
+  { featureType:"poi.park", elementType:"geometry", stylers:[{color:"#162535"}] },
+  { featureType:"poi.park", elementType:"labels.text.fill", stylers:[{color:"#3C7A3C"}] },
+  { featureType:"road", elementType:"geometry", stylers:[{color:"#2d2d4e"}] },
+  { featureType:"road", elementType:"geometry.stroke", stylers:[{color:"#0F2747"}] },
+  { featureType:"road", elementType:"labels.text.fill", stylers:[{color:"#9ca5b3"}] },
+  { featureType:"road.highway", elementType:"geometry", stylers:[{color:"#0F2747"}] },
+  { featureType:"road.highway", elementType:"geometry.stroke", stylers:[{color:"#D4A96A"}] },
+  { featureType:"road.highway", elementType:"labels.text.fill", stylers:[{color:"#f3d19c"}] },
+  { featureType:"transit", elementType:"geometry", stylers:[{color:"#2f3948"}] },
+  { featureType:"transit.station", elementType:"labels.text.fill", stylers:[{color:"#D4A96A"}] },
+  { featureType:"water", elementType:"geometry", stylers:[{color:"#0F2747"}] },
+  { featureType:"water", elementType:"labels.text.fill", stylers:[{color:"#4e6d70"}] },
+  { featureType:"water", elementType:"labels.text.stroke", stylers:[{color:"#17263c"}] },
+];
+
+// ─── REAL GOOGLE MAP ──────────────────────────────────────────────
+const RealMap = ({ bounties = [], scanning = false, center, theme }) => {
+  const [selected, setSelected] = useState(null);
+  const mapCenter = center || (bounties[0] ? { lat: bounties[0].lat, lng: bounties[0].lng } : { lat: 40.4168, lng: -3.7038 });
+  const zoom = bounties.length > 0 ? 14 : 13;
+
+  // Use day style for chill, dark pirate style for everything else
+  const mapId = theme?.isDay ? "roadmap" : "DEMO_MAP_ID";
+
+  return (
+    <APIProvider apiKey={MAPS_API_KEY}>
+      <Map
+        defaultCenter={mapCenter}
+        defaultZoom={zoom}
+        mapId={mapId}
+        styles={theme?.isDay ? [] : PIRATE_MAP_STYLE}
+        disableDefaultUI={false}
+        gestureHandling="greedy"
+        style={{ width:"100%", height:"100%", borderRadius:"16px" }}
+      >
+        {bounties.map((b, i) => (
+          <AdvancedMarker
+            key={b.place_id || i}
+            position={{ lat: b.lat, lng: b.lng }}
+            onClick={() => setSelected(selected?.place_id === b.place_id ? null : b)}
+          >
+            <div style={{
+              background: theme?.numberBadgeBg || "#8B2020",
+              color: "white", width:"32px", height:"32px",
+              borderRadius:"50% 50% 50% 0", transform:"rotate(-45deg)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              border:"2px solid rgba(255,255,255,0.3)",
+              boxShadow:"0 2px 8px rgba(0,0,0,0.4)",
+              cursor:"pointer",
+            }}>
+              <span style={{ transform:"rotate(45deg)", fontSize:"13px", fontWeight:700 }}>{i+1}</span>
+            </div>
+          </AdvancedMarker>
+        ))}
+        {selected && (
+          <InfoWindow
+            position={{ lat: selected.lat, lng: selected.lng }}
+            onCloseClick={() => setSelected(null)}
+          >
+            <div style={{ padding:"4px 8px", maxWidth:"200px" }}>
+              <div style={{ fontWeight:700, fontSize:"14px", color:"#0F2747", marginBottom:"2px" }}>{selected.pirate_name}</div>
+              <div style={{ fontSize:"12px", color:"#666" }}>{selected.address}</div>
+              {selected.maps_url && (
+                <a href={selected.maps_url} target="_blank" rel="noopener noreferrer" style={{ fontSize:"12px", color:"#0F2747", fontWeight:600, textDecoration:"none", display:"block", marginTop:"6px" }}>⚓ Open in Maps →</a>
+              )}
+            </div>
+          </InfoWindow>
+        )}
+        {scanning && (
+          <AdvancedMarker position={{ lat:40.4168, lng:-3.7038 }}>
+            <div style={{ width:"20px", height:"20px", borderRadius:"50%", background:"#D4A96A", boxShadow:"0 0 0 0 rgba(212,169,106,0.7)", animation:"scanPulse 1.5s ease-out infinite" }}/>
+          </AdvancedMarker>
+        )}
+      </Map>
+    </APIProvider>
+  );
+};
+
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
@@ -829,6 +920,23 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // ─── SCROLL CARD ──────────────────────────────────────────────────
+function ConfirmSwapButton({ onConfirm, swapping, theme }) {
+  const [confirming, setConfirming] = useState(false);
+  const t = theme || {};
+  if (swapping) return (
+    <button disabled style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${t.cardBorder||"rgba(255,255,255,0.15)"}`, color:t.textMuted||"rgba(255,255,255,0.55)", borderRadius:10, padding:"0.75rem 1rem", fontSize:"0.8rem", cursor:"not-allowed", whiteSpace:"nowrap" }}>...</button>
+  );
+  if (confirming) return (
+    <div style={{ display:"flex", gap:"6px" }}>
+      <button onClick={() => { setConfirming(false); onConfirm(); }} style={{ background:"rgba(255,80,80,0.15)", border:"1px solid rgba(255,80,80,0.3)", color:"#ff6b6b", borderRadius:10, padding:"0.75rem 0.8rem", fontSize:"0.8rem", cursor:"pointer", whiteSpace:"nowrap" }}>Yes, swap</button>
+      <button onClick={() => setConfirming(false)} style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${t.cardBorder||"rgba(255,255,255,0.15)"}`, color:t.textMuted||"rgba(255,255,255,0.55)", borderRadius:10, padding:"0.75rem 0.8rem", fontSize:"0.8rem", cursor:"pointer", whiteSpace:"nowrap" }}>Cancel</button>
+    </div>
+  );
+  return (
+    <button onClick={() => setConfirming(true)} style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${t.cardBorder||"rgba(255,255,255,0.15)"}`, color:t.textMuted||"rgba(255,255,255,0.55)", borderRadius:10, padding:"0.75rem 1rem", fontSize:"0.8rem", cursor:"pointer", whiteSpace:"nowrap" }}>✕ Not feeling it</button>
+  );
+}
+
 function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPlan, onFavorite, isFavorited }) {
   const t = theme || {};
   const [addMsg, setAddMsg] = useState("");
@@ -845,41 +953,72 @@ function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPl
     <div style={{
       background: t.cardBg || "rgba(255,255,255,0.07)",
       border: `1px solid ${t.cardBorder || "rgba(255,255,255,0.12)"}`,
-      borderRadius: 16,
-      overflow: "hidden",
+      borderRadius: 16, overflow: "hidden",
+      boxShadow: `0 4px 24px ${t.accentGlow || "rgba(0,0,0,0.3)"}`,
       opacity: visible ? 1 : 0,
       transform: visible ? "translateY(0)" : "translateY(24px)",
-      transition: "0.5s",
+      transition: "opacity 0.5s ease, transform 0.5s ease",
+      filter: swapping ? "opacity(0.3)" : "none",
+      pointerEvents: swapping ? "none" : "all",
     }}>
+      {bounty.photo_url && (
+        <img src={bounty.photo_url} alt={bounty.name}
+          style={{ width: "100%", height: 180, objectFit: "cover", display: "block", filter: "brightness(0.85) saturate(0.9)" }} />
+      )}
       <div style={{ padding: "1.25rem 1.5rem" }}>
-        <div style={{ display:"flex", justifyContent:"space-between" }}>
-          <div>{bounty.pirate_name}</div>
-
-          <div style={{ display:"flex", gap:"6px" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.15rem", fontWeight: 600, color: t.textPrimary || "white" }}>
+            {bounty.pirate_name}
+          </div>
+          <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
             {onFavorite && (
-              <button onClick={() => onFavorite(bounty)}>
-                {isFavorited ? "❤️" : "🤍"}
-              </button>
+              <button onClick={() => onFavorite(bounty)} title={isFavorited?"Remove from favorites":"Save to favorites"} style={{
+                background: isFavorited ? "rgba(255,80,80,0.15)" : "rgba(255,255,255,0.07)",
+                border: `1px solid ${isFavorited ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.15)"}`,
+                borderRadius:"50%", width:"32px", height:"32px", cursor:"pointer",
+                fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center",
+              }}>{isFavorited ? "❤️" : "🤍"}</button>
             )}
-
             {onAddToPlan && (
-              <button onClick={handleAddToPlan}>
-                {addMsg ? "✓" : "+"}
-              </button>
+              <button onClick={handleAddToPlan} title="Add to a plan" style={{
+                background: addMsg ? "rgba(80,200,120,0.15)" : "rgba(255,255,255,0.07)",
+                border: `1px solid ${addMsg ? "rgba(80,200,120,0.3)" : "rgba(255,255,255,0.15)"}`,
+                borderRadius:"50%", width:"32px", height:"32px", cursor:"pointer",
+                fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center",
+              }}>{addMsg ? "✓" : "+"}</button>
             )}
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%",
+              background: t.numberBadgeBg || "#8B2020",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "0.72rem", fontWeight: 700, color: "white",
+            }}>{index + 1}</div>
           </div>
         </div>
-
-        <div>{bounty.name}</div>
-
-        <div style={{ marginTop: 10 }}>
-          <a href={bounty.maps_url} target="_blank">
-            Open in Maps
-          </a>
-
-          <button onClick={() => onSwap(bounty.place_id)}>
-            Swap
-          </button>
+        <div style={{ fontSize: "0.82rem", color: t.textMuted || "rgba(255,255,255,0.5)", marginBottom: "0.85rem" }}>
+          {bounty.name}{bounty.price_level ? " · " + "💰".repeat(bounty.price_level) : ""}
+        </div>
+        <div style={{
+          fontFamily: "'Crimson Text', serif", fontStyle: "italic", fontSize: "1.05rem",
+          color: t.textMuted || "rgba(255,255,255,0.65)", lineHeight: 1.5,
+          borderLeft: `2.5px solid ${t.goldColor || "#D4A96A"}`, paddingLeft: "0.9rem", marginBottom: "1rem",
+        }}>"{bounty.hook}"</div>
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: "0.85rem" }}>
+          <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: t.textMuted || "rgba(255,255,255,0.5)" }}>
+            {bounty.rating && <span style={{ color: t.goldColor || "#D4A96A" }}>{"★".repeat(Math.floor(bounty.rating))} {bounty.rating}</span>}
+            {bounty.address && <span>📍 {bounty.address}</span>}
+          </div>
+          <div style={{ fontSize: "0.78rem", color: t.goldColor || "#D4A96A", fontStyle: "italic" }}>{bounty.send_off}</div>
+        </div>
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <a href={bounty.maps_url} target="_blank" rel="noopener noreferrer" style={{
+            flex: 1, background: t.numberBadgeBg || "#0F2747",
+            color: "white", border: "none", borderRadius: 10,
+            padding: "0.75rem", fontSize: "0.82rem", fontWeight: 500,
+            textAlign: "center", textDecoration: "none",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}>⚓ Claim this Bounty</a>
+          <ConfirmSwapButton onConfirm={() => onSwap(bounty.place_id)} swapping={swapping} theme={t} />
         </div>
       </div>
     </div>
@@ -1032,6 +1171,7 @@ const BASE_CSS = `
 
   /* ANIMATIONS */
   @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes scanPulse { 0% { box-shadow:0 0 0 0 rgba(212,169,106,0.7); } 70% { box-shadow:0 0 0 20px rgba(212,169,106,0); } 100% { box-shadow:0 0 0 0 rgba(212,169,106,0); } }
   @keyframes sunPulse { 0%,100%{box-shadow:0 0 60px 20px rgba(255,220,80,0.4)} 50%{box-shadow:0 0 80px 30px rgba(255,220,80,0.55)} }
   .fu { animation:fadeUp 0.6s ease forwards; opacity:0; }
   .fu1{animation-delay:0.1s} .fu2{animation-delay:0.25s} .fu3{animation-delay:0.4s} .fu4{animation-delay:0.55s}
@@ -1213,7 +1353,7 @@ function ProfilePanel({ user, onClose }) {
 // ─── PLANS PANEL ──────────────────────────────────────────────────
 
 // ─── PLANS PANEL ──────────────────────────────────────────────────
-function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
+function PlansPanel({ user, onClose, onAddToplan, bounties }) {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newPlanName, setNewPlanName] = useState("");
@@ -1227,46 +1367,14 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [joinToken, setJoinToken] = useState("");
   const [joinMsg, setJoinMsg] = useState("");
-  const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
-  const [planMsg, setPlanMsg] = useState("");
-
-  function buildInviteToken() {
-    return `plan-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
-  }
 
   useEffect(() => { loadPlans(); }, []);
 
   async function loadPlans() {
     setLoading(true);
-    const { data: memberOf, error: memberErr } = await supabase
-      .from("plan_members")
-      .select("plan_id")
-      .eq("user_id", user.id);
-
-    // Fallback: if plan_members policies are broken, at least show plans you created.
-    if (memberErr) {
-      const { data: owned } = await supabase
-        .from("plans")
-        .select("*")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false });
-      setPlans(owned || []);
-      setLoading(false);
-      return;
-    }
-
-    const ids = (memberOf || []).map(m => m.plan_id);
-    if (!ids.length) {
-      const { data: owned } = await supabase
-        .from("plans")
-        .select("*")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false });
-      setPlans(owned || []);
-      setLoading(false);
-      return;
-    }
-
+    const { data: memberOf } = await supabase.from("plan_members").select("plan_id").eq("user_id", user.id);
+    if (!memberOf?.length) { setPlans([]); setLoading(false); return; }
+    const ids = memberOf.map(m => m.plan_id);
     const { data } = await supabase.from("plans").select("*").in("id", ids).order("created_at", { ascending: false });
     setPlans(data || []);
     setLoading(false);
@@ -1275,50 +1383,12 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
   async function createPlan() {
     if (!newPlanName.trim()) return;
     setCreating(true);
-    setPlanMsg("");
-    const invite_token = buildInviteToken();
-    // Use minimal insert first to avoid select-policy recursion on insert response.
-    const { error: insertErr } = await supabase
-      .from("plans")
-      .insert({ name: newPlanName.trim(), created_by: user.id, invite_token });
-
-    if (insertErr) {
-      setPlanMsg(`❌ Could not create plan: ${insertErr.message || "unknown error"}`);
-      setCreating(false);
-      return;
-    }
-
-    // Try to resolve the created plan row (fallback to owned list if policies are restrictive).
-    let createdPlan = null;
-    const { data: createdRows } = await supabase
-      .from("plans")
-      .select("*")
-      .eq("created_by", user.id)
-      .eq("name", newPlanName.trim())
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (createdRows?.length) {
-      createdPlan = createdRows[0];
-      if (!createdPlan.invite_token) {
-        await supabase.from("plans").update({ invite_token }).eq("id", createdPlan.id);
-        createdPlan = { ...createdPlan, invite_token };
-      }
-    }
-
-    // Best-effort member insert; can fail if RLS policies recurse.
-    if (createdPlan?.id) {
-      await supabase.from("plan_members").insert({ plan_id: createdPlan.id, user_id: user.id });
-    }
-
-    setNewPlanName("");
-    await loadPlans();
-
-    if (createdPlan) {
-      await openPlan(createdPlan);
-      setPlanMsg("");
-    } else {
-      setPlanMsg("⚠️ Plan created. Refresh the list if it doesn't appear immediately.");
+    const { data, error } = await supabase.from("plans").insert({ name: newPlanName.trim(), created_by: user.id }).select().single();
+    if (!error && data) {
+      await supabase.from("plan_members").insert({ plan_id: data.id, user_id: user.id });
+      setNewPlanName("");
+      await loadPlans();
+      openPlan(data);
     }
     setCreating(false);
   }
@@ -1326,20 +1396,12 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
   async function openPlan(plan) {
     const { data: freshPlan } = await supabase.from("plans").select("*").eq("id", plan.id).single();
     setSelectedPlan(freshPlan || plan);
-    const { data: members, error: membersErr } = await supabase.from("plan_members").select("user_id").eq("plan_id", plan.id);
+    const { data: members } = await supabase.from("plan_members").select("user_id").eq("plan_id", plan.id);
     const memberIds = (members || []).map(m => m.user_id);
-
-    if (membersErr || memberIds.length === 0) {
-      setPlanMembers([{ id: user.id, username: user.email?.split("@")[0], email: user.email }]);
-      const { data: favs } = await supabase.from("favorites").select("*, profiles(username, email)").eq("user_id", user.id);
-      setMemberFavorites(favs || []);
-    } else {
-      const { data: profiles } = await supabase.from("profiles").select("id, username, email").in("id", memberIds);
-      setPlanMembers(profiles || []);
-      const { data: favs } = await supabase.from("favorites").select("*, profiles(username, email)").in("user_id", memberIds);
-      setMemberFavorites(favs || []);
-    }
-
+    const { data: profiles } = await supabase.from("profiles").select("id, username, email").in("id", memberIds);
+    setPlanMembers(profiles || []);
+    const { data: favs } = await supabase.from("favorites").select("*, profiles(username, email)").in("user_id", memberIds);
+    setMemberFavorites(favs || []);
     const { data: places } = await supabase.from("plan_places").select("*").eq("plan_id", plan.id);
     setPlanPlaces(places || []);
     setInviteMsg(""); setLinkCopied(false);
@@ -1358,30 +1420,15 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
   }
 
   function copyInviteLink() {
-    const code = selectedPlan.invite_token || selectedPlan.id;
-    const link = `${window.location.origin}?join=${code}`;
+    const link = `${window.location.origin}?join=${selectedPlan.invite_token}`;
     navigator.clipboard.writeText(link).then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 3000); });
-  }
-
-  function shareInviteWhatsApp() {
-    if (!selectedPlan) return;
-    const code = selectedPlan.invite_token || selectedPlan.id;
-    const link = `${window.location.origin}?join=${code}`;
-    const msg = encodeURIComponent(`Join my RUMBO plan "${selectedPlan.name}" ⚓\n${link}`);
-    setSharingWhatsApp(true);
-    window.open(`https://wa.me/?text=${msg}`, "_blank", "noopener,noreferrer");
-    setTimeout(() => setSharingWhatsApp(false), 2000);
   }
 
   async function joinByToken() {
     setJoinMsg("");
     if (!joinToken.trim()) return;
-    const cleanToken = joinToken.trim().replace(/^.*join=/, "").trim();
-    const { data: plan } = await supabase
-      .from("plans")
-      .select("*")
-      .or(`invite_token.eq.${cleanToken},id.eq.${cleanToken}`)
-      .single();
+    const token = joinToken.trim().includes("?join=") ? joinToken.trim().split("?join=")[1] : joinToken.trim();
+    const { data: plan } = await supabase.from("plans").select("*").eq("invite_token", token).single();
     if (!plan) { setJoinMsg("❌ Invalid invite code."); return; }
     const { data: existing } = await supabase.from("plan_members").select("user_id").eq("plan_id", plan.id).eq("user_id", user.id).single();
     if (existing) { setJoinMsg("⚠️ Already in this plan!"); return; }
@@ -1433,7 +1480,6 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
                     {creating?"...":"Create ⚓"}
                   </button>
                 </div>
-                {planMsg && <div style={{ marginTop:"8px", fontSize:"13px", color:planMsg.startsWith("❌")?"#ff6b6b":"#ffd54f" }}>{planMsg}</div>}
               </div>
 
               <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"12px", padding:"16px", marginBottom:"20px" }}>
@@ -1456,12 +1502,15 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   <div style={{ fontSize:"11px", color:"rgba(212,169,106,0.5)", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"4px" }}>{plans.length} plan{plans.length!==1?"s":""}</div>
                   {plans.map(plan => (
-                    <button key={plan.id} onClick={()=>openPlan(plan)} style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"12px", padding:"16px", cursor:"pointer", textAlign:"left", color:"inherit", width:"100%", transition:"all 0.2s" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.09)"}
-                      onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
-                      <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"16px", color:"#F7F4EE", marginBottom:"4px" }}>📋 {plan.name}</div>
-                      <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.35)" }}>{new Date(plan.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
-                    </button>
+                    <div key={plan.id} style={{ display:"flex", gap:"8px" }}>
+                      <button onClick={()=>openPlan(plan)} style={{ flex:1, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:"12px", padding:"16px", cursor:"pointer", textAlign:"left", color:"inherit", transition:"all 0.2s" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.09)"}
+                        onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
+                        <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"16px", color:"#F7F4EE", marginBottom:"4px" }}>📋 {plan.name}</div>
+                        <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.35)" }}>{new Date(plan.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</div>
+                      </button>
+                      <button onClick={async()=>{ if(!window.confirm("Delete this plan?")) return; await supabase.from("plan_members").delete().eq("plan_id",plan.id); await supabase.from("plans").delete().eq("id",plan.id).eq("created_by",user.id); loadPlans(); }} style={{ background:"rgba(255,80,80,0.08)", border:"1px solid rgba(255,80,80,0.2)", borderRadius:"12px", padding:"0 14px", cursor:"pointer", color:"rgba(255,100,100,0.7)", fontSize:"18px", flexShrink:0 }}>🗑</button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1473,13 +1522,10 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
                 <div style={{ fontSize:"11px", color:"rgba(212,169,106,0.7)", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"10px" }}>🔗 Invite Link</div>
                 <div style={{ display:"flex", gap:"8px" }}>
                   <div style={{ flex:1, background:"rgba(0,0,0,0.2)", borderRadius:"8px", padding:"8px 12px", fontSize:"12px", color:"rgba(255,255,255,0.4)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {`rumbo.app?join=${selectedPlan.invite_token || selectedPlan.id}`}
+                    {selectedPlan.invite_token?`rumbo.app?join=${selectedPlan.invite_token}`:"Generating..."}
                   </div>
                   <button onClick={copyInviteLink} style={{ padding:"8px 14px", borderRadius:"8px", border:"none", background:linkCopied?"#51cf66":"#D4A96A", color:"#0F2747", fontWeight:700, cursor:"pointer", fontSize:"13px", transition:"all 0.2s" }}>
                     {linkCopied?"✓ Copied!":"Copy"}
-                  </button>
-                  <button onClick={shareInviteWhatsApp} style={{ padding:"8px 12px", borderRadius:"8px", border:"none", background:sharingWhatsApp?"#51cf66":"rgba(255,255,255,0.12)", color:"white", fontWeight:700, cursor:"pointer", fontSize:"13px", transition:"all 0.2s" }}>
-                    {sharingWhatsApp ? "✓" : "WhatsApp"}
                   </button>
                 </div>
               </div>
@@ -1514,7 +1560,7 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
                   <div style={{ background:"rgba(255,255,255,0.04)", border:"1px dashed rgba(255,255,255,0.1)", borderRadius:"12px", padding:"24px", textAlign:"center" }}>
                     <div style={{ fontSize:"28px", marginBottom:"8px" }}>🗺️</div>
                     <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"13px", marginBottom:"12px" }}>No places added yet.<br/>Search for places and hit <strong style={{color:"#D4A96A"}}>+</strong> to add them here.</div>
-                    <button onClick={() => { onClose(); onGoToBrief?.(); }} style={{ background:"#D4A96A", color:"#0F2747", border:"none", borderRadius:"20px", padding:"8px 20px", cursor:"pointer", fontSize:"13px", fontWeight:700 }}>
+                    <button onClick={onClose} style={{ background:"#D4A96A", color:"#0F2747", border:"none", borderRadius:"20px", padding:"8px 20px", cursor:"pointer", fontSize:"13px", fontWeight:700 }}>
                       🧭 Find Places
                     </button>
                   </div>
@@ -1568,7 +1614,6 @@ function PlansPanel({ user, onClose, onAddToPlan, bounties, onGoToBrief }) {
 }
 
 export default function App() {
-  
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
@@ -1597,13 +1642,7 @@ export default function App() {
   const currentVibe = preferences?.vibe || null;
   const theme = currentVibe ? VIBE_THEMES[currentVibe] : null;
 
-  function toggleRole(roleId) {
-  setRoles(prev =>
-    prev.includes(roleId)
-      ? prev.filter(r => r !== roleId)
-      : [...prev, roleId]
-  );
-  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -1614,23 +1653,6 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setFavoritedIds(new Set());
-      return;
-    }
-    let active = true;
-    supabase
-      .from("favorites")
-      .select("place_id")
-      .eq("user_id", user.id)
-      .then(({ data }) => {
-        if (!active) return;
-        setFavoritedIds(new Set((data || []).map(row => row.place_id)));
-      });
-    return () => { active = false; };
-  }, [user]);
 
   function getCoords() {
     if (!selectedBarrio) return location || MADRID_CENTER;
@@ -1764,35 +1786,20 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!user) return;
-    const params = new URLSearchParams(window.location.search);
-    const joinCode = params.get("join");
-    if (!joinCode) return;
+    if (screen !== "hunting") return;
+    let i = 0; setScanMsg(SCAN_MESSAGES[0]);
+    const iv = setInterval(() => { i = (i + 1) % SCAN_MESSAGES.length; setScanMsg(SCAN_MESSAGES[i]); }, 2200);
+    return () => clearInterval(iv);
+  }, [screen]);
 
-    let cancelled = false;
-    (async () => {
-      const { data: plan } = await supabase
-        .from("plans")
-        .select("*")
-        .or(`invite_token.eq.${joinCode},id.eq.${joinCode}`)
-        .single();
-      if (!plan || cancelled) return;
+  useEffect(() => {
+    if (screen === "reveal" && bounties.length > 0) {
+      setVisible([]);
+      setTimeout(() => bounties.forEach((_, i) => setTimeout(() => setVisible(p => [...p, i]), i * 500)), 100);
+    }
+  }, [screen, bounties]);
 
-      const { data: existing } = await supabase
-        .from("plan_members")
-        .select("user_id")
-        .eq("plan_id", plan.id)
-        .eq("user_id", user.id)
-        .single();
-
-      if (!existing) {
-        await supabase.from("plan_members").insert({ plan_id: plan.id, user_id: user.id });
-      }
-      if (!cancelled) setShowPlans(true);
-    })();
-
-    return () => { cancelled = true; };
-  }, [user]);
+  function toggleRole(id) { setRoles(p => p.includes(id) ? p.filter(r => r !== id) : [...p, id]); }
 
   const canSail = description.trim() || selectedRoles.length > 0;
 
@@ -1828,9 +1835,9 @@ export default function App() {
           </div>
         </div>
         <ul className="nav-links">
-        <li><a href="#how">How It Works</a></li>
-        <li><a href="#routes">Treasure Routes</a></li>
-        <li><a href="#" onClick={e=>{e.preventDefault();reset();}}>Start Fresh</a></li>
+          <li><a href="#how">How It Works</a></li>
+          <li><a href="#routes">Treasure Routes</a></li>
+          <li><a href="#" onClick={e=>{e.preventDefault();reset();}}>Start Fresh</a></li>
         </ul>
         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
           <button onClick={() => setShowPlans(true)} style={{ display:"flex", alignItems:"center", gap:"6px", background:"rgba(15,39,71,0.08)", border:"1px solid rgba(15,39,71,0.15)", borderRadius:"40px", padding:"0.5rem 1rem", cursor:"pointer", fontSize:"0.82rem", color:"#4a3820", fontWeight:500 }}>
@@ -1996,6 +2003,7 @@ export default function App() {
         <div style={{ position:"relative", ...revealPageStyle }}>
           {/* Dynamic sky */}
           {theme && <SkyBackground vibe={currentVibe}/>}
+
           <div className="reveal-wrap">
             {/* Vibe badge + title */}
             <div style={{ textAlign:"center", marginBottom:"2rem" }}>
@@ -2030,8 +2038,8 @@ export default function App() {
             </div>
 
             {/* Treasure map */}
-            <div className="map-wrap wide" style={{ marginBottom:"2rem", filter: theme?.mapFilter || "none" }}>
-              <TreasureMapSVG bounties={bounties} scanning={false}/>
+            <div className="map-wrap wide" style={{ marginBottom:"2rem" }}>
+              <RealMap bounties={bounties} theme={theme} center={bounties[0] ? {lat:bounties[0].lat, lng:bounties[0].lng} : null} />
             </div>
 
             {/* Vibe meter */}
@@ -2039,10 +2047,6 @@ export default function App() {
               <VibeMeter preferences={preferences}/>
             </div>
 
-            {/* Treasure log */}
-            <div style={{ color: theme?.textPrimary || "white" }}>
-              <TreasureLog onSelect={restoreFromLog} theme={theme}/>
-            </div>
 
             {/* Route optimizer */}
             <div style={{ color: theme?.textPrimary || "white" }}>
@@ -2068,13 +2072,8 @@ export default function App() {
                 />
               ))}
             </div>
-            </div>
 
-            {error && (
-              <div className="err-box" style={{marginBottom:"1rem"}}>
-                ⚠️ {error}
-              </div>
-            )}
+            {error && <div className="err-box" style={{marginBottom:"1rem"}}>⚠️ {error}</div>}
 
             <div className="bot-actions">
               <button className="bot-btn" onClick={reset} style={{
@@ -2088,27 +2087,18 @@ export default function App() {
               <button className="bot-btn" onClick={()=>setShowShare(true)} style={{
                 background: theme?.goldColor || "#D4A96A", color:"#0F2747",
               }}>🖼 Share Card</button>
+            </div>
           </div>
+
+          {/* Share card modal */}
           {showShare && (
-            <ShareCard
-              bounties={bounties}
-              preferences={preferences}
-              theme={theme}
-              onClose={() => setShowShare(false)}
-            />
+            <ShareCard bounties={bounties} preferences={preferences} theme={theme} onClose={()=>setShowShare(false)}/>
           )}
         </div>
       )}
       {showProfile && <ProfilePanel user={user} onClose={() => setShowProfile(false)} />}
-      {showPlans && (
-        <PlansPanel
-          user={user}
-          onClose={() => setShowPlans(false)}
-          onAddToPlan={addBountyToPlan}
-          bounties={bounties}
-          onGoToBrief={() => setScreen("brief")}
-        />
-      )}
+      {showPlans && <PlansPanel user={user} onClose={() => setShowPlans(false)} />}
+
       {/* Add to plan modal */}
       {showAddToPlan && (
         <div style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
