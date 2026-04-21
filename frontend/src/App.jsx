@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps";
 import { supabase } from "./supabase";
 
@@ -153,10 +153,178 @@ const MascotSVG = ({ size = 140, animation = "float", style: extraStyle = {} }) 
   </div>
 );
 
+/** Three themed mascot chests (wood + bicorne + skull) — matches hero mascot language */
+function TreasureChestMascot({ variant = "feast", selected = false, animationDelay = "0s" }) {
+  const uid = useId().replace(/:/g, "");
+  const T = {
+    feast: { w1: "#4A2A0A", w2: "#2a1506", gold: "#C8A84B", hat: "#0d1a2e", seam: "#2a1506" },
+    culture: { w1: "#2a4a52", w2: "#1a3038", gold: "#6ab4c4", hat: "#0a1f28", seam: "#1a3038" },
+    moonlight: { w1: "#4a3258", w2: "#2a1838", gold: "#b894d4", hat: "#1a0a28", seam: "#2a1838" },
+  }[variant] || {
+    w1: "#4A2A0A",
+    w2: "#2a1506",
+    gold: "#C8A84B",
+    hat: "#0d1a2e",
+    seam: "#2a1506",
+  };
+  const gid = `wood-${uid}`;
+  return (
+    <div
+      className={`treasure-chest-mascot ${selected ? "sel" : ""}`}
+      style={{ animationDelay }}
+      aria-hidden
+    >
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="treasure-chest-mascot-svg">
+        <defs>
+          <linearGradient id={gid} x1="50" y1="36" x2="50" y2="96" gradientUnits="userSpaceOnUse">
+            <stop stopColor={T.w1} />
+            <stop offset="1" stopColor={T.w2} />
+          </linearGradient>
+        </defs>
+        {/* Bicorne + skull (reference mascot) */}
+        <path d="M32,24 L50,14 L68,24 L64,30 L36,30 Z" fill={T.hat} opacity="0.98" />
+        <ellipse cx="50" cy="26" rx="11" ry="4" fill="#F7F4EE" opacity="0.1" />
+        <g transform="translate(50, 22)">
+          <circle cx="0" cy="0" r="4.2" fill="#F7F4EE" opacity="0.95" />
+          <circle cx="-1.4" cy="-0.3" r="1.1" fill="#1a1a2e" />
+          <circle cx="1.4" cy="-0.3" r="1.1" fill="#1a1a2e" />
+          <path d="M-1.8,1.8 Q0,3 1.8,1.8" stroke="#1a1a2e" strokeWidth="0.65" fill="none" strokeLinecap="round" />
+        </g>
+        {/* Lid */}
+        <path d="M14,48 Q50,36 86,48 L86,56 Q50,44 14,56 Z" fill={`url(#${gid})`} />
+        <path d="M14,48 Q50,36 86,48" stroke={T.seam} strokeWidth="1.2" fill="none" opacity="0.5" />
+        <path d="M14,48 Q50,36 86,48" stroke={T.gold} strokeWidth="0.9" fill="none" opacity="0.45" />
+        <ellipse cx="50" cy="52" rx="28" ry="5" fill="#F0C040" opacity="0.14" />
+        {/* Body */}
+        <rect x="14" y="55" width="72" height="38" rx="6" fill={`url(#${gid})`} />
+        <rect x="14" y="67" width="72" height="1.5" rx="0.7" fill={T.seam} opacity="0.55" />
+        <rect x="14" y="80" width="72" height="1.5" rx="0.7" fill={T.seam} opacity="0.55" />
+        <rect x="14" y="55" width="72" height="3.5" rx="1.5" fill={T.gold} />
+        <rect x="14" y="72" width="72" height="5" rx="2" fill={T.gold} />
+        <rect x="14" y="89" width="72" height="3.5" rx="1.5" fill={T.gold} opacity="0.85" />
+        <rect x="47" y="55" width="6" height="38" rx="2" fill={T.gold} opacity="0.92" />
+        <rect x="11" y="42" width="9" height="14" rx="2.5" fill={T.gold} />
+        <rect x="80" y="42" width="9" height="14" rx="2.5" fill={T.gold} />
+        <rect x="11" y="60" width="9" height="14" rx="2.5" fill={T.gold} />
+        <rect x="80" y="60" width="9" height="14" rx="2.5" fill={T.gold} />
+        <rect x="43" y="70" width="14" height="10" rx="3" fill={T.gold} />
+        <path d="M46,70 Q46,64 50,64 Q54,64 54,70" stroke={T.gold} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        <circle cx="50" cy="75" r="2.5" fill="#5c3d10" />
+        {/* Eyes */}
+        <circle cx="36" cy="48" r="7" fill="white" />
+        <circle cx="64" cy="48" r="7" fill="white" />
+        <circle cx="36" cy="48" r="7" fill="none" stroke={T.gold} strokeWidth="0.8" />
+        <circle cx="64" cy="48" r="7" fill="none" stroke={T.gold} strokeWidth="0.8" />
+        <circle cx="37" cy="48" r="4" fill="#1a1a2e" style={{ animation: "blink 4.5s ease-in-out infinite" }} />
+        <circle cx="65" cy="48" r="4" fill="#1a1a2e" style={{ animation: "blink 4.5s 0.1s ease-in-out infinite" }} />
+        <circle cx="38.5" cy="46.5" r="1.4" fill="white" />
+        <circle cx="66.5" cy="46.5" r="1.4" fill="white" />
+        <path d="M40,58 Q50,65 60,58" stroke={T.gold} strokeWidth="2" fill="none" strokeLinecap="round" />
+        <circle cx="20" cy="42" r="1.5" fill="#F0C040" opacity="0.7" style={{ animation: "sparkle 2.2s 0.3s ease-in-out infinite" }} />
+        <circle cx="80" cy="44" r="1.2" fill="#F0C040" opacity="0.6" style={{ animation: "sparkle 2.2s 1s ease-in-out infinite" }} />
+      </svg>
+    </div>
+  );
+}
+
+function BriefHeroStarfield() {
+  return (
+    <svg className="brief-hero-starfield" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      {Array.from({ length: 48 }, (_, i) => (
+        <circle
+          key={i}
+          cx={`${(Math.sin(i * 137.5) * 0.5 + 0.5) * 100}%`}
+          cy={`${(Math.cos(i * 97.3) * 0.5 + 0.5) * 100}%`}
+          r={0.4 + (i % 3) * 0.45}
+          fill="white"
+          style={{ animation: `starTwinkle ${2 + (i % 5) * 0.5}s ${i * 0.18}s ease-in-out infinite` }}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function BriefHeroFloatingDecor() {
+  return (
+    <>
+      <div className="brief-float brief-float--compass">
+        <svg width="58" height="58" viewBox="0 0 76 76" aria-hidden>
+          <circle cx="38" cy="38" r="35" fill="none" stroke="#C8A84B" strokeWidth="1.5" strokeDasharray="4 5" />
+          <circle cx="38" cy="38" r="26" fill="none" stroke="#C8A84B" strokeWidth="0.7" opacity="0.45" />
+          <polygon points="38,6 41,32 38,38 35,32" fill="#F7F4EE" />
+          <polygon points="38,70 41,44 38,38 35,44" fill="#C8A84B" opacity="0.55" />
+          <polygon points="6,38 32,35 38,38 32,41" fill="#C8A84B" opacity="0.55" />
+          <polygon points="70,38 44,35 38,38 44,41" fill="#F7F4EE" />
+          <circle cx="38" cy="38" r="5" fill="#C8A84B" />
+          <circle cx="38" cy="38" r="2.5" fill="#1a1a2e" />
+          <text x="38" y="11" textAnchor="middle" fill="#C8A84B" fontSize="7" fontWeight="bold">
+            N
+          </text>
+        </svg>
+      </div>
+      <div className="brief-float brief-float--coin">
+        <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden>
+          <circle cx="20" cy="20" r="18" fill="#C8A84B" stroke="#F0C040" strokeWidth="1.5" />
+          <circle cx="20" cy="20" r="12" fill="none" stroke="#8B6914" strokeWidth="0.8" />
+          <text x="20" y="25" textAnchor="middle" fill="#8B6914" fontSize="13" fontWeight="bold">
+            $
+          </text>
+        </svg>
+      </div>
+      <div className="brief-float brief-float--scroll">
+        <svg width="30" height="38" viewBox="0 0 30 38" aria-hidden>
+          <rect x="4" y="4" width="22" height="30" rx="2" fill="#F5E8BE" stroke="#C8A84B" strokeWidth="1.2" />
+          <path d="M4,4 Q1,4 1,8 Q1,12 4,12" fill="#E8CC80" />
+          <path d="M26,4 Q29,4 29,8 Q29,12 26,12" fill="#E8CC80" />
+          <line x1="8" y1="16" x2="22" y2="16" stroke="#C8A84B" strokeWidth="0.9" opacity="0.6" />
+          <line x1="8" y1="20" x2="22" y2="20" stroke="#C8A84B" strokeWidth="0.9" opacity="0.4" />
+          <line x1="8" y1="24" x2="17" y2="24" stroke="#C8A84B" strokeWidth="0.9" opacity="0.4" />
+        </svg>
+      </div>
+      <div className="brief-float brief-float--ship">
+        <svg width="44" height="44" viewBox="0 0 60 50" aria-hidden>
+          <path d="M8,34 Q30,42 52,34 L49,44 Q30,52 11,44 Z" fill="#3A2010" />
+          <line x1="30" y1="34" x2="30" y2="6" stroke="#3A2010" strokeWidth="2.2" />
+          <line x1="18" y1="16" x2="42" y2="16" stroke="#3A2010" strokeWidth="1" />
+          <path d="M30,7 L30,32 L43,26 L42,16 Z" fill="#FFFCF0" stroke="#C8A84B" strokeWidth="0.6" opacity="0.95" />
+          <path d="M30,7 L30,32 L17,26 L18,16 Z" fill="#FFF5D8" stroke="#C8A84B" strokeWidth="0.6" opacity="0.88" />
+          <path d="M30,5 L37,7 L30,9 Z" fill="#1a1a1a" />
+        </svg>
+      </div>
+    </>
+  );
+}
+
+function BriefHeroFooterIcons() {
+  return (
+    <div className="brief-hero-footer-icons" aria-hidden>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M4 12L12 4l8 8M8 12v6h8v-6" stroke="rgba(212,169,106,0.75)" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3v18M8 21h8M9 3h6v4H9V3z" stroke="rgba(212,169,106,0.75)" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="12" cy="14" r="5" stroke="rgba(212,169,106,0.55)" strokeWidth="1.2" />
+      </svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="5" width="18" height="14" rx="2" stroke="rgba(212,169,106,0.75)" strokeWidth="1.4" />
+        <path d="M3 10h18M8 5v14" stroke="rgba(212,169,106,0.55)" strokeWidth="1.2" />
+      </svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <rect x="4" y="7" width="16" height="12" rx="2" stroke="rgba(212,169,106,0.75)" strokeWidth="1.4" />
+        <path d="M4 10h16M12 7v-2M8 19h8" stroke="rgba(212,169,106,0.55)" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="11" r="6" stroke="rgba(212,169,106,0.75)" strokeWidth="1.4" />
+        <path d="M8 19c1.5-2 10-2 11.5 0" stroke="rgba(212,169,106,0.55)" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
 const API = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 const BARRIOS = [
-  { name: "Surprise Me 🎲", lat: 40.4168, lng: -3.7038, surprise: true },
+  { name: "Surprise Me", lat: 40.4168, lng: -3.7038, surprise: true },
   { name: "Malasaña", lat: 40.4270, lng: -3.7030 },
   { name: "Chueca", lat: 40.4243, lng: -3.6957 },
   { name: "La Latina", lat: 40.4130, lng: -3.7110 },
@@ -169,13 +337,70 @@ const BARRIOS = [
 ];
 
 const CREW_ROLES = [
-  { id: "broke", label: "The Broke One", emoji: "🪙", desc: "Needs it cheap" },
-  { id: "foodie", label: "The Foodie", emoji: "🍽️", desc: "Lives to eat" },
-  { id: "nightowl", label: "The Night Owl", emoji: "🦉", desc: "Goes all night" },
-  { id: "explorer", label: "The Explorer", emoji: "🗺️", desc: "Hates tourists" },
-  { id: "romantic", label: "The Romantic", emoji: "🌹", desc: "Sets the mood" },
-  { id: "culture", label: "The Culture Vulture", emoji: "🎭", desc: "Wants character" },
+  { id: "broke", label: "The Broke One", desc: "Needs it cheap" },
+  { id: "foodie", label: "The Foodie", desc: "Lives to eat" },
+  { id: "nightowl", label: "The Night Owl", desc: "Goes all night" },
+  { id: "explorer", label: "The Explorer", desc: "Hates tourists" },
+  { id: "romantic", label: "The Romantic", desc: "Sets the mood" },
+  { id: "culture", label: "The Culture Vulture", desc: "Wants character" },
 ];
+
+const CHEST_OPTIONS = [
+  {
+    id: "restaurants_bars",
+    variant: "feast",
+    title: "Feast & Grog",
+    subtitle: "Restaurants & bars",
+    accent: "#C8A84B",
+  },
+  {
+    id: "museums",
+    variant: "culture",
+    title: "Captain's Culture",
+    subtitle: "Museums & culture",
+    accent: "#6ab4c4",
+  },
+  {
+    id: "clubs",
+    variant: "moonlight",
+    title: "Moonlight Raid",
+    subtitle: "Clubs & late nights",
+    accent: "#b894d4",
+  },
+];
+
+const SORT_OPTIONS = [
+  { id: "popularity", label: "Most Popular" },
+  { id: "price", label: "Best Price" },
+  { id: "location", label: "Closest" },
+];
+
+const CLUB_DAY_OPTIONS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const CLUB_AGE_OPTIONS = [
+  { id: "18-20", label: "18–20" },
+  { id: "21-25", label: "21–25" },
+  { id: "25-35", label: "25–35" },
+  { id: "35+", label: "+35" },
+];
+
+/** Crew mode: no free-text box — we synthesize a clear brief for the API from chips + chest */
+function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clubAge }) {
+  const chest = CHEST_OPTIONS.find((c) => c.id === categoryId);
+  const chestLine = chest
+    ? `Voyage: ${chest.title} — ${chest.subtitle}.`
+    : `Voyage category: ${categoryId}.`;
+  const parts = [chestLine];
+  if (barrio?.name) parts.push(`Area focus: ${barrio.name}.`);
+  if (roleLabels.length) parts.push(`Crew archetypes: ${roleLabels.join(", ")}.`);
+  const sortLabel = SORT_OPTIONS.find((s) => s.id === sortMode)?.label || sortMode;
+  parts.push(`Prefer results ranked by: ${sortLabel}.`);
+  if (categoryId === "clubs" && clubDay && clubAge) {
+    const ageLabel = CLUB_AGE_OPTIONS.find((a) => a.id === clubAge)?.label || clubAge;
+    parts.push(`Club context: ${clubDay}, age band ${ageLabel}.`);
+  }
+  parts.push("Find three exceptional hidden-gem places in Madrid that fit this brief.");
+  return parts.join(" ");
+}
 
 const SCAN_MESSAGES = [
   "⚓ Setting sail from your coordinates...",
@@ -601,100 +826,6 @@ const TreasureMapSVG = ({ bounties = [], scanning = false }) => {
     </svg>
   );
 };
-
-// ─── HERO ILLUSTRATED PANEL ───────────────────────────────────────
-const HeroIllustratedPanel = () => (
-  <div className="hero-panel">
-    {/* Starfield */}
-    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} xmlns="http://www.w3.org/2000/svg">
-      {Array.from({length:50},(_,i)=>(
-        <circle key={i}
-          cx={`${(Math.sin(i*137.5)*0.5+0.5)*100}%`}
-          cy={`${(Math.cos(i*97.3)*0.5+0.5)*100}%`}
-          r={0.5+(i%3)*0.5} fill="white"
-          style={{animation:`starTwinkle ${2+(i%5)*0.5}s ${i*0.18}s ease-in-out infinite`}}
-        />
-      ))}
-    </svg>
-
-    {/* Floating compass */}
-    <div style={{position:"absolute",bottom:"10%",left:"7%",animation:"floatSlow 4.5s 0.5s ease-in-out infinite",opacity:0.5}}>
-      <svg width="58" height="58" viewBox="0 0 76 76">
-        <circle cx="38" cy="38" r="35" fill="none" stroke="#C8A84B" strokeWidth="1.5" strokeDasharray="4 5"/>
-        <circle cx="38" cy="38" r="26" fill="none" stroke="#C8A84B" strokeWidth="0.7" opacity="0.45"/>
-        <polygon points="38,6 41,32 38,38 35,32" fill="#F7F4EE"/>
-        <polygon points="38,70 41,44 38,38 35,44" fill="#C8A84B" opacity="0.55"/>
-        <polygon points="6,38 32,35 38,38 32,41" fill="#C8A84B" opacity="0.55"/>
-        <polygon points="70,38 44,35 38,38 44,41" fill="#F7F4EE"/>
-        <circle cx="38" cy="38" r="5" fill="#C8A84B"/>
-        <circle cx="38" cy="38" r="2.5" fill="#1a1a2e"/>
-        <text x="38" y="3" textAnchor="middle" fill="#C8A84B" fontSize="7" fontWeight="bold">N</text>
-      </svg>
-    </div>
-
-    {/* Floating coin */}
-    <div style={{position:"absolute",top:"12%",right:"9%",animation:"float 2.8s 1.2s ease-in-out infinite",opacity:0.65}}>
-      <svg width="40" height="40" viewBox="0 0 40 40">
-        <circle cx="20" cy="20" r="18" fill="#C8A84B" stroke="#F0C040" strokeWidth="1.5"/>
-        <circle cx="20" cy="20" r="12" fill="none" stroke="#8B6914" strokeWidth="0.8"/>
-        <text x="20" y="25" textAnchor="middle" fill="#8B6914" fontSize="13" fontWeight="bold">$</text>
-      </svg>
-    </div>
-
-    {/* Floating scroll */}
-    <div style={{position:"absolute",top:"40%",left:"5%",animation:"float 3.6s 0.2s ease-in-out infinite",opacity:0.45}}>
-      <svg width="30" height="38" viewBox="0 0 30 38">
-        <rect x="4" y="4" width="22" height="30" rx="2" fill="#F5E8BE" stroke="#C8A84B" strokeWidth="1.2"/>
-        <path d="M4,4 Q1,4 1,8 Q1,12 4,12" fill="#E8CC80"/>
-        <path d="M26,4 Q29,4 29,8 Q29,12 26,12" fill="#E8CC80"/>
-        <line x1="8" y1="16" x2="22" y2="16" stroke="#C8A84B" strokeWidth="0.9" opacity="0.6"/>
-        <line x1="8" y1="20" x2="22" y2="20" stroke="#C8A84B" strokeWidth="0.9" opacity="0.4"/>
-        <line x1="8" y1="24" x2="17" y2="24" stroke="#C8A84B" strokeWidth="0.9" opacity="0.4"/>
-      </svg>
-    </div>
-
-    {/* Ship — top right */}
-    <div style={{position:"absolute",top:"8%",right:"6%",animation:"floatSlow 5s 0.8s ease-in-out infinite",opacity:0.4}}>
-      <svg width="44" height="44" viewBox="0 0 60 50">
-        <path d="M8,34 Q30,42 52,34 L49,44 Q30,52 11,44 Z" fill="#3A2010"/>
-        <line x1="30" y1="34" x2="30" y2="6" stroke="#3A2010" strokeWidth="2.2"/>
-        <line x1="18" y1="16" x2="42" y2="16" stroke="#3A2010" strokeWidth="1"/>
-        <path d="M30,7 L30,32 L43,26 L42,16 Z" fill="#FFFCF0" stroke="#C8A84B" strokeWidth="0.6" opacity="0.95"/>
-        <path d="M30,7 L30,32 L17,26 L18,16 Z" fill="#FFF5D8" stroke="#C8A84B" strokeWidth="0.6" opacity="0.88"/>
-        <path d="M30,5 L37,7 L30,9 Z" fill="#1a1a1a"/>
-      </svg>
-    </div>
-
-    {/* Mascot */}
-    <div style={{position:"relative",zIndex:2,textAlign:"center",padding:"1rem"}}>
-      <MascotSVG size={160} animation="float"/>
-      <div style={{
-        fontFamily:"'Crimson Text',serif", fontSize:"1.05rem",
-        color:"rgba(212,169,106,0.8)", marginTop:"0.5rem",
-        fontStyle:"italic", letterSpacing:"0.04em",
-        textShadow:"0 2px 8px rgba(0,0,0,0.4)",
-      }}>
-        "Aye, I know every hidden gem…"
-      </div>
-    </div>
-
-    {/* Bottom gradient + label */}
-    <div style={{
-      position:"absolute", bottom:0, left:0, right:0,
-      background:"linear-gradient(0deg,rgba(10,22,48,0.95) 0%,transparent 100%)",
-      padding:"1.5rem 1.25rem 1.1rem", textAlign:"center",
-    }}>
-      <div style={{fontSize:"0.7rem",letterSpacing:"0.25em",textTransform:"uppercase",color:"#D4A96A",marginBottom:"0.5rem"}}>
-        Hidden Gems of Madrid
-      </div>
-      <div style={{display:"flex",justifyContent:"center",gap:"0.65rem"}}>
-        {["🏴‍☠️","⚓","🗺️","💰","☠️"].map((e,i)=>(
-          <span key={i} style={{fontSize:"1rem",opacity:0.65}}>{e}</span>
-        ))}
-      </div>
-    </div>
-  </div>
-);
 
 // ─── VIBE METER ───────────────────────────────────────────────────
 const VibeMeter = ({ preferences }) => {
@@ -1262,6 +1393,40 @@ const BASE_CSS = `
   html { scroll-behavior: smooth; }
   body { background: #0F2747; font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
 
+  /* Brief screen: cream sky → teal → deep navy + star speckle (fused with chest deck) */
+  .brief-bg-layer {
+    background: linear-gradient(165deg,
+      #eef4f8 0%,
+      #d4e6ef 12%,
+      #7fa3b8 36%,
+      #2a4a62 58%,
+      #0f1f34 78%,
+      #050a12 100%);
+  }
+  .brief-bg-layer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.65;
+    background-image:
+      radial-gradient(1.5px 1.5px at 8% 18%, rgba(255,255,255,0.95) 50%, transparent 50%),
+      radial-gradient(1px 1px at 22% 42%, rgba(255,255,255,0.75) 50%, transparent 50%),
+      radial-gradient(1.2px 1.2px at 38% 12%, rgba(255,255,255,0.85) 50%, transparent 50%),
+      radial-gradient(1px 1px at 55% 28%, rgba(255,255,255,0.55) 50%, transparent 50%),
+      radial-gradient(1.4px 1.4px at 71% 48%, rgba(255,255,255,0.9) 50%, transparent 50%),
+      radial-gradient(1px 1px at 88% 22%, rgba(255,255,255,0.65) 50%, transparent 50%),
+      radial-gradient(1.2px 1.2px at 14% 68%, rgba(255,255,255,0.8) 50%, transparent 50%),
+      radial-gradient(1px 1px at 33% 82%, rgba(255,255,255,0.5) 50%, transparent 50%),
+      radial-gradient(1.3px 1.3px at 52% 72%, rgba(255,255,255,0.88) 50%, transparent 50%),
+      radial-gradient(1px 1px at 67% 88%, rgba(255,255,255,0.6) 50%, transparent 50%),
+      radial-gradient(1.5px 1.5px at 84% 62%, rgba(255,255,255,0.92) 50%, transparent 50%),
+      radial-gradient(1px 1px at 93% 90%, rgba(255,255,255,0.55) 50%, transparent 50%),
+      radial-gradient(2px 2px at 48% 55%, rgba(212,169,106,0.35) 50%, transparent 50%),
+      radial-gradient(1.2px 1.2px at 76% 12%, rgba(255,255,255,0.7) 50%, transparent 50%);
+    mix-blend-mode: screen;
+  }
+
   /* NAVBAR */
   .navbar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 100;
@@ -1291,12 +1456,191 @@ const BASE_CSS = `
     max-width: 1200px; margin: 0 auto; padding-left:3rem; padding-right:3rem;
     position: relative; z-index: 1;
   }
+  .hero-brief-unified {
+    grid-template-columns: 1fr;
+    max-width: 920px;
+    align-items: start;
+    gap: 0;
+  }
+  .brief-hero-column { width: 100%; position: relative; z-index: 1; }
 
   /* INPUT CARD */
   .input-card {
     background:rgba(255,255,255,0.9); backdrop-filter:blur(16px);
     border:1px solid #E0D4B8; border-radius:20px; padding:1.75rem;
     box-shadow:0 8px 40px rgba(15,39,71,0.12);
+  }
+  .input-card-fused {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    backdrop-filter: none;
+  }
+  .chest-hero-scene {
+    position: relative;
+    border-radius: 20px 20px 0 0;
+    margin-bottom: 0;
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 100%, rgba(74,140,180,0.22) 0%, transparent 55%),
+      linear-gradient(175deg, #0d1f3c 0%, #1a3a6a 40%, #0a1628 100%);
+    border: 2px solid rgba(212,169,106,0.3);
+    border-bottom: none;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 16px 56px rgba(0,0,0,0.45),
+      0 0 90px rgba(30,80,120,0.18);
+    overflow: hidden;
+    animation: pulseGlow 4s ease-in-out infinite;
+  }
+  .brief-hero-starfield {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.88;
+  }
+  .brief-float { position: absolute; z-index: 1; pointer-events: none; }
+  .brief-float--compass { bottom: 8%; left: 4%; animation: floatSlow 4.5s 0.5s ease-in-out infinite; opacity: 0.42; }
+  .brief-float--coin { top: 10%; right: 6%; animation: float 2.8s 1.2s ease-in-out infinite; opacity: 0.52; }
+  .brief-float--scroll { top: 36%; left: 3%; animation: float 3.6s 0.2s ease-in-out infinite; opacity: 0.36; }
+  .brief-float--ship { top: 6%; right: 4%; animation: floatSlow 5s 0.8s ease-in-out infinite; opacity: 0.32; }
+  .chest-hero-scene-main {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    padding: 1.5rem 0.75rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .chest-scene-footer {
+    position: relative;
+    z-index: 2;
+    padding: 1.25rem 1rem 1.2rem;
+    text-align: center;
+    background: linear-gradient(0deg, rgba(5,10,24,0.95) 0%, rgba(5,10,24,0.2) 100%);
+  }
+  .chest-scene-quote {
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    font-style: italic;
+    color: rgba(212,169,106,0.88);
+    text-shadow: 0 2px 14px rgba(0,0,0,0.55);
+    margin-bottom: 0.45rem;
+  }
+  .chest-scene-brand {
+    font-size: 0.66rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #D4A96A;
+    margin-bottom: 0.6rem;
+  }
+  .brief-hero-footer-icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.85rem;
+    opacity: 0.75;
+  }
+  .chest-picker-mascot { align-items: end; }
+  .chest-tile-mascot {
+    --chest-accent: #C8A84B;
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.25rem 0.65rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.22s ease;
+    animation: chestFloat 5.6s ease-in-out infinite;
+  }
+  .chest-tile-mascot:nth-child(1) { animation-delay: 0s; }
+  .chest-tile-mascot:nth-child(2) { animation-delay: 0.35s; }
+  .chest-tile-mascot:nth-child(3) { animation-delay: 0.7s; }
+  .chest-tile-mascot:hover { transform: translateY(-3px); }
+  .treasure-chest-mascot {
+    width: 100%;
+    max-width: min(210px, 30vw);
+    margin: 0 auto;
+    animation: float 3.1s ease-in-out infinite;
+    filter: drop-shadow(0 14px 28px rgba(0,0,0,0.5));
+  }
+  .treasure-chest-mascot-svg { width: 100%; height: auto; display: block; transition: transform 0.3s ease, filter 0.3s ease; }
+  .chest-tile-mascot:hover .treasure-chest-mascot-svg { transform: translateY(-5px) scale(1.03); }
+  .chest-tile-mascot.sel .treasure-chest-mascot {
+    filter: drop-shadow(0 18px 40px rgba(212,169,106,0.42)) drop-shadow(0 0 24px rgba(212,169,106,0.25));
+  }
+  .chest-tile-mascot.sel .treasure-chest-mascot-svg { transform: translateY(-4px) scale(1.04); }
+  .chest-tile-mascot-labels { margin-top: 0.55rem; text-align: center; max-width: 12rem; }
+  .chest-mascot-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #f7e8c8;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.65);
+    display: block;
+    line-height: 1.2;
+  }
+  .chest-mascot-sub {
+    font-family: 'Crimson Text', serif;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: rgba(232,216,190,0.84);
+    display: block;
+    margin-top: 0.15rem;
+    line-height: 1.3;
+  }
+  .features-bar-brief .feat-glyph { font-size: 0.55rem; color: #B8860B; opacity: 0.85; margin-right: 2px; }
+  .role-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #D4A96A, #8B6914);
+    margin: 0 auto 0.35rem;
+    display: block;
+  }
+  .chest-deck-label {
+    position: relative;
+    z-index: 1;
+    font-family: 'Playfair Display', serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #e8c87a;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.45);
+    display: block;
+    margin-bottom: 0.35rem;
+    text-align: center;
+  }
+  .chest-deck-tagline {
+    position: relative;
+    z-index: 1;
+    font-family: 'Crimson Text', serif;
+    font-style: italic;
+    font-size: 0.88rem;
+    color: rgba(232,216,180,0.78);
+    text-align: center;
+    margin-bottom: 1.1rem;
+    line-height: 1.45;
+  }
+  .input-card-body {
+    position: relative;
+    background: rgba(255,255,255,0.94);
+    backdrop-filter: blur(18px);
+    border: 1px solid #E0D4B8;
+    border-top: 1px solid rgba(212,169,106,0.28);
+    border-radius: 0 0 20px 20px;
+    padding: 1.65rem 1.75rem 1.75rem;
+    box-shadow: 0 16px 48px rgba(15,39,71,0.14);
   }
   .input-label { font-size:0.7rem; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:#8a7a5a; margin-bottom:0.6rem; display:block; }
   .input-textarea {
@@ -1317,11 +1661,40 @@ const BASE_CSS = `
   .chip.sel { background:#0F2747; border-color:#0F2747; color:white; }
   .chip.surprise { border-style:dashed; border-color:rgba(212,169,106,0.5); color:#8B6914; }
   .chip.surprise.sel { background:#B8860B; border-color:#B8860B; color:white; border-style:solid; }
+  .chest-picker-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:1.15rem; align-items:stretch; position:relative; z-index:1; }
+  .brief-tabs {
+    display:flex; gap:0; margin-bottom:1rem; background:rgba(247,244,238,0.75); border-radius:14px;
+    padding:5px; border:1px solid #E0D4B8;
+  }
+  .brief-tab {
+    flex:1; border:none; background:transparent; padding:0.7rem 0.85rem;
+    font-size:0.68rem; font-weight:700; letter-spacing:0.14em; color:#8a7a5a; cursor:pointer;
+    border-radius:11px; transition:all 0.22s; font-family:'DM Sans',sans-serif; text-transform:uppercase;
+  }
+  .brief-tab.sel { background:#0F2747; color:#F7F4EE; box-shadow:0 4px 14px rgba(15,39,71,0.18); }
+  .brief-tab:hover:not(.sel) { color:#0F2747; background:rgba(255,255,255,0.5); }
+  .capitan-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-bottom:0.55rem; }
+  .capitan-plus {
+    flex-shrink:0; width:42px; height:42px; border-radius:50%; border:1.5px solid #E0D4B8; background:#FDF8F1;
+    color:#0F2747; font-size:1.5rem; font-weight:300; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:all 0.22s;
+    font-family:'DM Sans',sans-serif;
+  }
+  .capitan-plus:hover { border-color:#D4A96A; background:white; transform:scale(1.06); box-shadow:0 4px 14px rgba(15,39,71,0.1); }
+  .capitan-plus.open { background:#0F2747; color:#F7F4EE; border-color:#0F2747; }
+  .captain-extras { margin-top:0.85rem; padding:0.9rem; border-radius:14px; border:1px dashed rgba(212,169,106,0.5);
+    background:rgba(212,169,106,0.07); animation:fadeUp 0.32s ease;
+  }
+  .club-filter-panel {
+    margin-top:0.7rem; padding:0.7rem 0.75rem; border-radius:12px;
+    border:1px solid rgba(212,169,106,0.35); background:rgba(212,169,106,0.06);
+    animation:fadeUp 0.32s ease;
+  }
+  .club-filter-grid { display:grid; grid-template-columns:1fr; gap:0.25rem; }
   .roles-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; margin-bottom:1rem; }
   .role-chip { background:white; border:1.5px solid #E0D4B8; border-radius:10px; padding:0.6rem 0.4rem; cursor:pointer; transition:all 0.15s; text-align:center; }
   .role-chip:hover { border-color:#D4A96A; }
   .role-chip.sel { background:rgba(15,39,71,0.05); border-color:#0F2747; }
-  .role-emoji { font-size:1.2rem; display:block; margin-bottom:0.15rem; }
   .role-name { font-size:0.65rem; color:#0F2747; display:block; font-weight:500; line-height:1.3; }
   .role-desc { font-size:0.62rem; color:#8a7a5a; font-style:italic; display:block; }
   .sail-btn {
@@ -1413,18 +1786,10 @@ const BASE_CSS = `
   @keyframes compassSpin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
   @keyframes starTwinkle { 0%,100%{opacity:0.15} 50%{opacity:0.8} }
   @keyframes chestShake { 0%,100%{transform:rotate(0deg) scale(1)} 25%{transform:rotate(-5deg) scale(1.04)} 75%{transform:rotate(5deg) scale(1.04)} }
+  @keyframes chestFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+  @keyframes chestShine { from{transform:translateX(-120%)} to{transform:translateX(120%)} }
   .fu { animation:fadeUp 0.6s ease forwards; opacity:0; }
   .fu1{animation-delay:0.1s} .fu2{animation-delay:0.25s} .fu3{animation-delay:0.4s} .fu4{animation-delay:0.55s}
-
-  /* HERO ILLUSTRATED PANEL */
-  .hero-panel {
-    position:relative; display:flex; align-items:center; justify-content:center;
-    border-radius:24px; overflow:hidden; aspect-ratio:4/5;
-    background:linear-gradient(160deg,#0d1f3c 0%,#1a3a6a 45%,#0a1628 100%);
-    border:2px solid rgba(212,169,106,0.3);
-    box-shadow:0 24px 80px rgba(15,39,71,0.35);
-    animation:pulseGlow 4s ease-in-out infinite;
-  }
 
   /* PREMIUM SAIL BUTTON */
   .sail-btn-premium {
@@ -1493,7 +1858,6 @@ const BASE_CSS = `
 
   @media (max-width:900px) {
     .hero { grid-template-columns:1fr; padding:5rem 1.5rem 2rem; gap:2rem; }
-    .hero-panel { aspect-ratio:16/9; min-height:260px; }
     .how-cards { grid-template-columns:1fr; }
     .routes-grid { grid-template-columns:repeat(2,1fr); }
     .vibe-grid { grid-template-columns:repeat(2,1fr); }
@@ -1503,10 +1867,15 @@ const BASE_CSS = `
     .hunting-wrap { padding:90px 1.25rem 3rem; }
     .how-section,.routes-section,.vibe-section { padding:3rem 1.5rem; }
     .rope-divider { padding:0 1.5rem; }
+    .chest-picker-grid { grid-template-columns:1fr; max-width:min(400px, 94vw); margin:0 auto; }
+    .chest-picker-mascot { grid-template-columns: 1fr; max-width: min(380px, 94vw); margin: 0 auto; }
+    .treasure-chest-mascot { max-width: min(280px, 72vw); }
+    .chest-hero-scene { min-height: auto; }
   }
   @media (max-width:600px) {
     .routes-grid { grid-template-columns:1fr; }
     .vibe-grid { grid-template-columns:1fr 1fr; }
+    .chest-picker-grid { grid-template-columns:1fr; max-width:min(420px, 96vw); }
   }
 `;
 
@@ -1945,9 +2314,15 @@ export default function App() {
   const [userPlans, setUserPlans] = useState([]);
   const [addMsg, setAddMsg] = useState("");
   const [screen, setScreen]           = useState("brief");
-  const [description, setDescription] = useState("");
   const [selectedBarrio, setBarrio]   = useState(null);
   const [selectedRoles, setRoles]     = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("restaurants_bars");
+  const [sortMode, setSortMode]       = useState("popularity");
+  const [clubDay, setClubDay]         = useState("");
+  const [clubAge, setClubAge]         = useState("");
+  const [briefInputTab, setBriefInputTab] = useState("crew");
+  const [captainPrompt, setCaptainPrompt] = useState("");
+  const [captainExtrasOpen, setCaptainExtrasOpen] = useState(false);
   const [bounties, setBounties]       = useState([]);
   const [preferences, setPrefs]       = useState(null);
   const [sessionKey, setSession]      = useState(null);
@@ -1976,18 +2351,47 @@ export default function App() {
   }, []);
 
   async function startHunt(descOverride = null, barrioOverride = undefined) {
-    const desc = descOverride ?? description;
     const barrio = barrioOverride !== undefined ? barrioOverride : selectedBarrio;
-    if (!desc.trim() && selectedRoles.length === 0) return;
+    const roleLabels = selectedRoles.map((id) => CREW_ROLES.find((r) => r.id === id)?.label).filter(Boolean);
+
+    let rawDesc;
+    if (descOverride != null) rawDesc = descOverride;
+    else if (briefInputTab === "capitan") rawDesc = captainPrompt;
+    else
+      rawDesc = buildCrewBrief({
+        categoryId: selectedCategory,
+        barrio,
+        roleLabels,
+        sortMode,
+        clubDay,
+        clubAge,
+      });
+
+    if (briefInputTab === "capitan" && !String(rawDesc).trim()) {
+      setError("Tell the Captain what you seek, or switch to Crew.");
+      return;
+    }
+    if (selectedCategory === "clubs" && (!clubDay || !clubAge)) {
+      setError("For clubs, choose both day and age before setting sail.");
+      return;
+    }
     setError(""); setScreen("hunting"); setReactions(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
     const coords = barrio && !barrio.surprise ? { lat: barrio.lat, lng: barrio.lng } : location || MADRID_CENTER;
-    const roleLabels = selectedRoles.map(id => CREW_ROLES.find(r => r.id === id)?.label).filter(Boolean);
-    const fullDesc = desc.trim() || `A crew with these roles: ${roleLabels.join(", ")}`;
+    const fullDesc = String(rawDesc).trim();
     try {
       const res = await fetch(`${API}/api/hunt`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: fullDesc, lat: coords.lat, lng: coords.lng, roles: roleLabels }),
+        body: JSON.stringify({
+          description: fullDesc,
+          lat: coords.lat,
+          lng: coords.lng,
+          roles: roleLabels,
+          category: selectedCategory,
+          sort_mode: sortMode,
+          day_of_week: selectedCategory === "clubs" ? clubDay : new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase(),
+          age_group: selectedCategory === "clubs" ? clubAge : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Unknown error");
@@ -2034,16 +2438,23 @@ export default function App() {
   }
 
   function reset() {
-    setScreen("brief"); setDescription(""); setBounties([]); setPrefs(null);
+    setScreen("brief"); setBounties([]); setPrefs(null);
     setSession(null); setError(""); setVisible([]); setCopied(false);
     setSwapping(null); setReactions(null);
+    setSelectedCategory("restaurants_bars");
+    setSortMode("popularity");
+    setClubDay("");
+    setClubAge("");
+    setBriefInputTab("crew");
+    setCaptainPrompt("");
+    setCaptainExtrasOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function restoreFromLog(entry) {
     setBounties(entry.bounties || []);
     setPrefs(entry.preferences || null);
-    setDescription(entry.description || "");
+    setCaptainPrompt(entry.description || "");
     setScreen("reveal");
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => entry.bounties?.forEach((_, i) => setTimeout(() => setVisible(p => [...p, i]), i * 400)), 100);
@@ -2116,7 +2527,23 @@ export default function App() {
 
   function toggleRole(id) { setRoles(p => p.includes(id) ? p.filter(r => r !== id) : [...p, id]); }
 
-  const canSail = description.trim() || selectedRoles.length > 0;
+  useEffect(() => {
+    if (selectedCategory !== "clubs") {
+      setClubDay("");
+      setClubAge("");
+    }
+  }, [selectedCategory]);
+
+  function getSailLabel() {
+    if (selectedCategory === "clubs") return "CHART MY NIGHT";
+    if (selectedCategory === "museums") return "REVEAL MY RELICS";
+    return "FIND MY FEAST";
+  }
+
+  const clubOk = selectedCategory !== "clubs" || (clubDay && clubAge);
+  const crewReady = clubOk;
+  const capitanReady = captainPrompt.trim() && clubOk;
+  const canSail = briefInputTab === "capitan" ? capitanReady : crewReady;
 
   // Dynamic reveal page styles based on vibe theme
   const revealPageStyle = theme ? {
@@ -2169,71 +2596,302 @@ export default function App() {
       {screen === "brief" && (
         <div style={{ position: "relative" }}>
           {/* Static hero bg */}
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 0,
-            background: "linear-gradient(160deg, #e8f5f7 0%, #d6edf0 20%, #EDE6D4 62%, #e0d8c0 100%)",
-            pointerEvents: "none",
-          }}/>
-          <section className="hero">
-            <div style={{ position:"relative", zIndex:1 }}>
-              <div className="hero-badge fu fu1">✦ AI-Powered Hidden Gem Finder</div>
+          <div
+            className="brief-bg-layer"
+            style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}
+          />
+          <section className="hero hero-brief-unified">
+            <div className="brief-hero-column">
+              <div className="hero-badge fu fu1">AI-Powered Hidden Gem Finder</div>
               <h1 className="hero-headline fu fu2">
-                You tell us your crew.
-                <em>We'll find the treasure.</em>
+                Chart your course.
+                <em>We&apos;ll find the treasure.</em>
               </h1>
               <p className="hero-sub fu fu3">
-                Skip the tourist traps. Get 3 hidden gem spots picked by an AI Pirate that knows Madrid's secret corners.
+                Skip the tourist traps. Three mascot chests chart what you hunt — feast, culture, or moonlight — on one night sea.
               </p>
 
-              <div className="input-card fu fu3">
-                <label className="input-label">Describe your crew</label>
-                <textarea className="input-textarea" value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="e.g. 4 broke students, want something different, not a chain..."
-                  rows={3} onKeyDown={e => { if (e.key==="Enter" && e.ctrlKey) startHunt(); }}
-                />
-                <div style={{ marginTop:"1rem" }}>
-                  <span className="chips-label">Pick a neighborhood</span>
-                  <div className="chips-row">
-                    {BARRIOS.map(b => (
-                      <button key={b.name}
-                        className={`chip ${b.surprise?"surprise":""} ${selectedBarrio?.name===b.name?"sel":""}`}
-                        onClick={()=>setBarrio(selectedBarrio?.name===b.name?null:b)}>
-                        {b.name}
-                      </button>
-                    ))}
+              <div className="input-card input-card-fused fu fu3">
+                <div className="chest-hero-scene">
+                  <BriefHeroStarfield />
+                  <BriefHeroFloatingDecor />
+                  <div className="chest-hero-scene-main">
+                    <span className="chest-deck-label">Choose your course</span>
+                    <p className="chest-deck-tagline">Three holds, three voyages — tap the chest that matches your crew.</p>
+                    <div className="chest-picker-grid chest-picker-mascot">
+                      {CHEST_OPTIONS.map((chest, i) => (
+                        <button
+                          type="button"
+                          key={chest.id}
+                          className={`chest-tile-mascot ${selectedCategory === chest.id ? "sel" : ""}`}
+                          style={{ "--chest-accent": chest.accent }}
+                          onClick={() => setSelectedCategory(chest.id)}
+                        >
+                          <TreasureChestMascot
+                            variant={chest.variant}
+                            selected={selectedCategory === chest.id}
+                            animationDelay={`${i * 0.2}s`}
+                          />
+                          <div className="chest-tile-mascot-labels">
+                            <span className="chest-mascot-title">{chest.title}</span>
+                            <span className="chest-mascot-sub">{chest.subtitle}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <span className="chips-label" style={{marginTop:"0.75rem"}}>Who's in your crew?</span>
-                  <div className="roles-grid">
-                    {CREW_ROLES.map(r => (
-                      <button key={r.id} className={`role-chip ${selectedRoles.includes(r.id)?"sel":""}`}
-                        onClick={()=>toggleRole(r.id)}>
-                        <span className="role-emoji">{r.emoji}</span>
-                        <span className="role-name">{r.label}</span>
-                        <span className="role-desc">{r.desc}</span>
-                      </button>
-                    ))}
+                  <div className="chest-scene-footer">
+                    <p className="chest-scene-quote">&ldquo;Aye, I know every hidden gem&hellip;&rdquo;</p>
+                    <div className="chest-scene-brand">Hidden Gems of Madrid</div>
+                    <BriefHeroFooterIcons />
                   </div>
                 </div>
-                <button className="sail-btn-premium" onClick={() => startHunt()} disabled={!canSail}>
-                  <span style={{color:"#D4A96A"}}>🧭</span> FIND MY TREASURES <span style={{color:"#D4A96A",marginLeft:4}}>→</span>
+
+                <div className="input-card-body">
+                <div className="brief-tabs" role="tablist" aria-label="Input mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={briefInputTab === "crew"}
+                    className={`brief-tab ${briefInputTab === "crew" ? "sel" : ""}`}
+                    onClick={() => { setBriefInputTab("crew"); setCaptainExtrasOpen(false); }}
+                  >
+                    Crew
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={briefInputTab === "capitan"}
+                    className={`brief-tab ${briefInputTab === "capitan" ? "sel" : ""}`}
+                    onClick={() => setBriefInputTab("capitan")}
+                  >
+                    Capitan
+                  </button>
+                </div>
+
+                {briefInputTab === "crew" ? (
+                  <>
+                    <p style={{ fontSize: "0.8rem", color: "#6b5c48", marginBottom: "0.85rem", lineHeight: 1.5 }}>
+                      <em>Crew</em> mode builds your orders from the chest, neighborhood, crew roles, and sort — no typing required. Switch to <strong>Capitan</strong> for a free-form brief.
+                    </p>
+                    {selectedCategory === "clubs" && (
+                      <div className="club-filter-panel" key="club-panel-crew">
+                        <span className="chips-label" style={{ marginTop: "0.85rem" }}>Night details (required)</span>
+                        <div className="club-filter-grid">
+                          <div>
+                            <span className="chips-label">Day</span>
+                            <div className="chips-row">
+                              {CLUB_DAY_OPTIONS.map((day) => (
+                                <button
+                                  type="button"
+                                  key={day}
+                                  className={`chip ${clubDay === day ? "sel" : ""}`}
+                                  onClick={() => setClubDay(day)}
+                                >
+                                  {day[0].toUpperCase() + day.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="chips-label">Age</span>
+                            <div className="chips-row">
+                              {CLUB_AGE_OPTIONS.map((age) => (
+                                <button
+                                  type="button"
+                                  key={age.id}
+                                  className={`chip ${clubAge === age.id ? "sel" : ""}`}
+                                  onClick={() => setClubAge(age.id)}
+                                >
+                                  {age.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <span className="chips-label" style={{ marginTop: "0.85rem" }}>Order results by</span>
+                    <div className="chips-row">
+                      {SORT_OPTIONS.map((option) => (
+                        <button
+                          type="button"
+                          key={option.id}
+                          className={`chip ${sortMode === option.id ? "sel" : ""}`}
+                          onClick={() => setSortMode(option.id)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: "1rem" }}>
+                      <span className="chips-label">Pick a neighborhood</span>
+                      <div className="chips-row">
+                        {BARRIOS.map((b) => (
+                          <button
+                            type="button"
+                            key={b.name}
+                            className={`chip ${b.surprise ? "surprise" : ""} ${selectedBarrio?.name === b.name ? "sel" : ""}`}
+                            onClick={() => setBarrio(selectedBarrio?.name === b.name ? null : b)}
+                          >
+                            {b.name}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="chips-label" style={{ marginTop: "0.75rem" }}>Who&apos;s in your crew?</span>
+                      <div className="roles-grid">
+                        {CREW_ROLES.map((r) => (
+                          <button
+                            type="button"
+                            key={r.id}
+                            className={`role-chip ${selectedRoles.includes(r.id) ? "sel" : ""}`}
+                            onClick={() => toggleRole(r.id)}
+                          >
+                            <span className="role-dot" />
+                            <span className="role-name">{r.label}</span>
+                            <span className="role-desc">{r.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="capitan-row">
+                      <label className="input-label" style={{ marginBottom: 0 }}>Captain&apos;s orders</label>
+                      <button
+                        type="button"
+                        className={`capitan-plus ${captainExtrasOpen ? "open" : ""}`}
+                        onClick={() => setCaptainExtrasOpen((o) => !o)}
+                        aria-expanded={captainExtrasOpen}
+                        aria-label={captainExtrasOpen ? "Hide crew and map options" : "Show crew and map options"}
+                      >
+                        {captainExtrasOpen ? "−" : "+"}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: "0.78rem", color: "#8a7a5a", marginBottom: "0.65rem", fontStyle: "italic", lineHeight: 1.45 }}>
+                      Speak freely to the navigator — then use + to layer neighborhood, crew roles, and sorting when you want precision.
+                    </p>
+                    <textarea
+                      className="input-textarea"
+                      value={captainPrompt}
+                      onChange={(e) => setCaptainPrompt(e.target.value)}
+                      placeholder="e.g. Friday night, four of us, techno-adjacent, not tourist traps, budget medium…"
+                      rows={4}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && e.ctrlKey) startHunt();
+                      }}
+                    />
+                    {selectedCategory === "clubs" && (
+                      <div className="club-filter-panel" key="club-panel-capitan">
+                        <span className="chips-label" style={{ marginTop: "0.85rem" }}>Night details (required)</span>
+                        <div className="club-filter-grid">
+                          <div>
+                            <span className="chips-label">Day</span>
+                            <div className="chips-row">
+                              {CLUB_DAY_OPTIONS.map((day) => (
+                                <button
+                                  type="button"
+                                  key={day}
+                                  className={`chip ${clubDay === day ? "sel" : ""}`}
+                                  onClick={() => setClubDay(day)}
+                                >
+                                  {day[0].toUpperCase() + day.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="chips-label">Age</span>
+                            <div className="chips-row">
+                              {CLUB_AGE_OPTIONS.map((age) => (
+                                <button
+                                  type="button"
+                                  key={age.id}
+                                  className={`chip ${clubAge === age.id ? "sel" : ""}`}
+                                  onClick={() => setClubAge(age.id)}
+                                >
+                                  {age.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {captainExtrasOpen && (
+                      <div className="captain-extras">
+                        <span className="chips-label">Refine the chart</span>
+                        <span className="chips-label" style={{ marginTop: "0.5rem" }}>Order results by</span>
+                        <div className="chips-row">
+                          {SORT_OPTIONS.map((option) => (
+                            <button
+                              type="button"
+                              key={option.id}
+                              className={`chip ${sortMode === option.id ? "sel" : ""}`}
+                              onClick={() => setSortMode(option.id)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="chips-label" style={{ marginTop: "0.75rem" }}>Pick a neighborhood</span>
+                        <div className="chips-row">
+                          {BARRIOS.map((b) => (
+                            <button
+                              type="button"
+                              key={b.name}
+                              className={`chip ${b.surprise ? "surprise" : ""} ${selectedBarrio?.name === b.name ? "sel" : ""}`}
+                              onClick={() => setBarrio(selectedBarrio?.name === b.name ? null : b)}
+                            >
+                              {b.name}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="chips-label" style={{ marginTop: "0.75rem" }}>Who&apos;s in your crew?</span>
+                        <div className="roles-grid">
+                          {CREW_ROLES.map((r) => (
+                            <button
+                              type="button"
+                              key={r.id}
+                              className={`role-chip ${selectedRoles.includes(r.id) ? "sel" : ""}`}
+                              onClick={() => toggleRole(r.id)}
+                            >
+                              <span className="role-dot" />
+                              <span className="role-name">{r.label}</span>
+                              <span className="role-desc">{r.desc}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <button type="button" className="sail-btn-premium" onClick={() => startHunt()} disabled={!canSail}>
+                  {getSailLabel()} <span style={{color:"#D4A96A",marginLeft:4}}>→</span>
                 </button>
                 <button className="surprise-btn" onClick={() => setScreen("surprise")}>
-                  🎲 Surprise Me — Let the Navigator Decide
+                  Surprise Me — Let the Navigator Decide
                 </button>
-                <p className="sail-tagline">🗺️ 3 hidden gems · Pirate descriptions · Google Maps links</p>
+                <p className="sail-tagline">3 hidden gems · Pirate-voiced picks · Google Maps links</p>
                 {error && <div className="err-box">⚠️ {error}</div>}
+                </div>
               </div>
 
-              <div className="features-bar fu fu4">
-                {[["💎","3 hidden gems"],["☠️","Pirate descriptions"],["📍","Google Maps ready"],["✦","AI-powered"]].map(([i,t])=>(
-                  <div key={t} className="feat"><span>{i}</span><span>{t}</span></div>
+              <div className="features-bar features-bar-brief fu fu4">
+                {[
+                  ["◆", "3 hidden gems"],
+                  ["◆", "Pirate-voiced picks"],
+                  ["◆", "Google Maps ready"],
+                  ["◆", "AI navigator"],
+                ].map(([i, t]) => (
+                  <div key={t} className="feat">
+                    <span className="feat-glyph">{i}</span>
+                    <span>{t}</span>
+                  </div>
                 ))}
               </div>
-            </div>
-
-            <div style={{ position:"relative", zIndex:1 }} className="fu fu2">
-              <HeroIllustratedPanel />
             </div>
           </section>
 
@@ -2243,9 +2901,9 @@ export default function App() {
               <p className="sec-sub">Discover hidden places in Madrid in under a minute.</p>
               <div className="how-cards">
                 {[
-                  {icon:"👥",title:"Describe Your Crew",text:"Tell RUMBO who you're with, what mood you're in, and what kind of place you want."},
-                  {icon:"🧭",title:"AI Hunts Hidden Gems",text:"Our pirate navigator searches beyond tourist traps to find places locals actually love."},
-                  {icon:"💰",title:"Claim Your Bounty",text:"Choose your favourite spot and open it in Google Maps. Swap any result you don't love."},
+                  {icon:"◆",title:"Pick Your Chest & Crew",text:"Choose a treasure chest for food, culture, or nightlife, then tune neighborhood, crew roles, and how results are ranked."},
+                  {icon:"◆",title:"AI Hunts Hidden Gems",text:"Our pirate navigator searches beyond tourist traps to find places locals actually love."},
+                  {icon:"◆",title:"Claim Your Bounty",text:"Choose your favourite spot and open it in Google Maps. Swap any result you don't love."},
                 ].map(c=>(
                   <div key={c.title} className="how-card">
                     <span className="how-icon">{c.icon}</span>
