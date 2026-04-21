@@ -92,6 +92,67 @@ const RealMap = ({ bounties = [], scanning = false, center, theme }) => {
 };
 
 
+// ─── MASCOT ───────────────────────────────────────────────────────
+const MascotSVG = ({ size = 140, animation = "float", style: extraStyle = {} }) => (
+  <div style={{ width:size, height:size, animation:`${animation} 3s ease-in-out infinite`, display:"inline-block", ...extraStyle }}>
+    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+      {/* Pirate hat */}
+      <polygon points="50,8 33,26 67,26" fill="#1a1a2e"/>
+      <rect x="29" y="26" width="42" height="7" rx="2.5" fill="#1a1a2e"/>
+      <rect x="43" y="15" width="14" height="12" rx="2" fill="#1a1a2e"/>
+      <rect x="31" y="30" width="38" height="2" rx="1" fill="#C8A84B" opacity="0.7"/>
+      <circle cx="50" cy="21" r="4" fill="#F7F4EE" opacity="0.9"/>
+      <circle cx="48.5" cy="22" r="1" fill="#1a1a2e"/>
+      <circle cx="51.5" cy="22" r="1" fill="#1a1a2e"/>
+      <line x1="47" y1="23.5" x2="50" y2="22.5" stroke="#1a1a2e" strokeWidth="0.7"/>
+      <line x1="53" y1="23.5" x2="50" y2="22.5" stroke="#1a1a2e" strokeWidth="0.7"/>
+      {/* Chest lid — slightly open */}
+      <path d="M14,48 Q50,36 86,48 L86,56 Q50,44 14,56 Z" fill="#4A2A0A"/>
+      <path d="M14,48 Q50,36 86,48" stroke="#6B3E1C" strokeWidth="1.2" fill="none"/>
+      <path d="M14,48 Q50,36 86,48" stroke="#C8A84B" strokeWidth="1" fill="none" opacity="0.5"/>
+      {/* Gold glow escaping from open lid */}
+      <ellipse cx="50" cy="52" rx="28" ry="5" fill="#F0C040" opacity="0.18"/>
+      {/* Chest body */}
+      <rect x="14" y="55" width="72" height="38" rx="6" fill="#3A1F08"/>
+      {/* Wood grain */}
+      <rect x="14" y="67" width="72" height="1.5" rx="0.7" fill="#2a1506" opacity="0.6"/>
+      <rect x="14" y="80" width="72" height="1.5" rx="0.7" fill="#2a1506" opacity="0.6"/>
+      {/* Gold top seam */}
+      <rect x="14" y="55" width="72" height="3.5" rx="1.5" fill="#C8A84B"/>
+      {/* Gold mid band */}
+      <rect x="14" y="72" width="72" height="5" rx="2" fill="#C8A84B"/>
+      {/* Gold bottom */}
+      <rect x="14" y="89" width="72" height="3.5" rx="1.5" fill="#C8A84B" opacity="0.8"/>
+      {/* Gold vertical band */}
+      <rect x="47" y="55" width="6" height="38" rx="2" fill="#C8A84B"/>
+      {/* Corner clasps */}
+      <rect x="11" y="42" width="9" height="14" rx="2.5" fill="#C8A84B"/>
+      <rect x="80" y="42" width="9" height="14" rx="2.5" fill="#C8A84B"/>
+      <rect x="11" y="60" width="9" height="14" rx="2.5" fill="#C8A84B"/>
+      <rect x="80" y="60" width="9" height="14" rx="2.5" fill="#C8A84B"/>
+      {/* Lock */}
+      <rect x="43" y="70" width="14" height="10" rx="3" fill="#C8A84B"/>
+      <path d="M46,70 Q46,64 50,64 Q54,64 54,70" stroke="#C8A84B" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+      <circle cx="50" cy="75" r="2.5" fill="#7a5010"/>
+      {/* Eyes on lid face */}
+      <circle cx="36" cy="48" r="7" fill="white"/>
+      <circle cx="64" cy="48" r="7" fill="white"/>
+      <circle cx="36" cy="48" r="7" fill="none" stroke="#C8A84B" strokeWidth="0.8"/>
+      <circle cx="64" cy="48" r="7" fill="none" stroke="#C8A84B" strokeWidth="0.8"/>
+      <circle cx="37" cy="48" r="4" fill="#1a1a2e" style={{animation:"blink 4.5s ease-in-out infinite"}}/>
+      <circle cx="65" cy="48" r="4" fill="#1a1a2e" style={{animation:"blink 4.5s 0.1s ease-in-out infinite"}}/>
+      <circle cx="38.5" cy="46.5" r="1.4" fill="white"/>
+      <circle cx="66.5" cy="46.5" r="1.4" fill="white"/>
+      {/* Smile */}
+      <path d="M40,58 Q50,65 60,58" stroke="#C8A84B" strokeWidth="2" fill="none" strokeLinecap="round"/>
+      {/* Sparkle accents */}
+      <circle cx="20" cy="42" r="1.5" fill="#F0C040" opacity="0.7" style={{animation:"sparkle 2.2s 0.3s ease-in-out infinite"}}/>
+      <circle cx="80" cy="44" r="1.2" fill="#F0C040" opacity="0.6" style={{animation:"sparkle 2.2s 1s ease-in-out infinite"}}/>
+      <circle cx="23" cy="74" r="1" fill="#F0C040" opacity="0.5" style={{animation:"sparkle 2.2s 1.7s ease-in-out infinite"}}/>
+    </svg>
+  </div>
+);
+
 const API = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 const BARRIOS = [
@@ -540,6 +601,100 @@ const TreasureMapSVG = ({ bounties = [], scanning = false }) => {
     </svg>
   );
 };
+
+// ─── HERO ILLUSTRATED PANEL ───────────────────────────────────────
+const HeroIllustratedPanel = () => (
+  <div className="hero-panel">
+    {/* Starfield */}
+    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} xmlns="http://www.w3.org/2000/svg">
+      {Array.from({length:50},(_,i)=>(
+        <circle key={i}
+          cx={`${(Math.sin(i*137.5)*0.5+0.5)*100}%`}
+          cy={`${(Math.cos(i*97.3)*0.5+0.5)*100}%`}
+          r={0.5+(i%3)*0.5} fill="white"
+          style={{animation:`starTwinkle ${2+(i%5)*0.5}s ${i*0.18}s ease-in-out infinite`}}
+        />
+      ))}
+    </svg>
+
+    {/* Floating compass */}
+    <div style={{position:"absolute",bottom:"10%",left:"7%",animation:"floatSlow 4.5s 0.5s ease-in-out infinite",opacity:0.5}}>
+      <svg width="58" height="58" viewBox="0 0 76 76">
+        <circle cx="38" cy="38" r="35" fill="none" stroke="#C8A84B" strokeWidth="1.5" strokeDasharray="4 5"/>
+        <circle cx="38" cy="38" r="26" fill="none" stroke="#C8A84B" strokeWidth="0.7" opacity="0.45"/>
+        <polygon points="38,6 41,32 38,38 35,32" fill="#F7F4EE"/>
+        <polygon points="38,70 41,44 38,38 35,44" fill="#C8A84B" opacity="0.55"/>
+        <polygon points="6,38 32,35 38,38 32,41" fill="#C8A84B" opacity="0.55"/>
+        <polygon points="70,38 44,35 38,38 44,41" fill="#F7F4EE"/>
+        <circle cx="38" cy="38" r="5" fill="#C8A84B"/>
+        <circle cx="38" cy="38" r="2.5" fill="#1a1a2e"/>
+        <text x="38" y="3" textAnchor="middle" fill="#C8A84B" fontSize="7" fontWeight="bold">N</text>
+      </svg>
+    </div>
+
+    {/* Floating coin */}
+    <div style={{position:"absolute",top:"12%",right:"9%",animation:"float 2.8s 1.2s ease-in-out infinite",opacity:0.65}}>
+      <svg width="40" height="40" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r="18" fill="#C8A84B" stroke="#F0C040" strokeWidth="1.5"/>
+        <circle cx="20" cy="20" r="12" fill="none" stroke="#8B6914" strokeWidth="0.8"/>
+        <text x="20" y="25" textAnchor="middle" fill="#8B6914" fontSize="13" fontWeight="bold">$</text>
+      </svg>
+    </div>
+
+    {/* Floating scroll */}
+    <div style={{position:"absolute",top:"40%",left:"5%",animation:"float 3.6s 0.2s ease-in-out infinite",opacity:0.45}}>
+      <svg width="30" height="38" viewBox="0 0 30 38">
+        <rect x="4" y="4" width="22" height="30" rx="2" fill="#F5E8BE" stroke="#C8A84B" strokeWidth="1.2"/>
+        <path d="M4,4 Q1,4 1,8 Q1,12 4,12" fill="#E8CC80"/>
+        <path d="M26,4 Q29,4 29,8 Q29,12 26,12" fill="#E8CC80"/>
+        <line x1="8" y1="16" x2="22" y2="16" stroke="#C8A84B" strokeWidth="0.9" opacity="0.6"/>
+        <line x1="8" y1="20" x2="22" y2="20" stroke="#C8A84B" strokeWidth="0.9" opacity="0.4"/>
+        <line x1="8" y1="24" x2="17" y2="24" stroke="#C8A84B" strokeWidth="0.9" opacity="0.4"/>
+      </svg>
+    </div>
+
+    {/* Ship — top right */}
+    <div style={{position:"absolute",top:"8%",right:"6%",animation:"floatSlow 5s 0.8s ease-in-out infinite",opacity:0.4}}>
+      <svg width="44" height="44" viewBox="0 0 60 50">
+        <path d="M8,34 Q30,42 52,34 L49,44 Q30,52 11,44 Z" fill="#3A2010"/>
+        <line x1="30" y1="34" x2="30" y2="6" stroke="#3A2010" strokeWidth="2.2"/>
+        <line x1="18" y1="16" x2="42" y2="16" stroke="#3A2010" strokeWidth="1"/>
+        <path d="M30,7 L30,32 L43,26 L42,16 Z" fill="#FFFCF0" stroke="#C8A84B" strokeWidth="0.6" opacity="0.95"/>
+        <path d="M30,7 L30,32 L17,26 L18,16 Z" fill="#FFF5D8" stroke="#C8A84B" strokeWidth="0.6" opacity="0.88"/>
+        <path d="M30,5 L37,7 L30,9 Z" fill="#1a1a1a"/>
+      </svg>
+    </div>
+
+    {/* Mascot */}
+    <div style={{position:"relative",zIndex:2,textAlign:"center",padding:"1rem"}}>
+      <MascotSVG size={160} animation="float"/>
+      <div style={{
+        fontFamily:"'Crimson Text',serif", fontSize:"1.05rem",
+        color:"rgba(212,169,106,0.8)", marginTop:"0.5rem",
+        fontStyle:"italic", letterSpacing:"0.04em",
+        textShadow:"0 2px 8px rgba(0,0,0,0.4)",
+      }}>
+        "Aye, I know every hidden gem…"
+      </div>
+    </div>
+
+    {/* Bottom gradient + label */}
+    <div style={{
+      position:"absolute", bottom:0, left:0, right:0,
+      background:"linear-gradient(0deg,rgba(10,22,48,0.95) 0%,transparent 100%)",
+      padding:"1.5rem 1.25rem 1.1rem", textAlign:"center",
+    }}>
+      <div style={{fontSize:"0.7rem",letterSpacing:"0.25em",textTransform:"uppercase",color:"#D4A96A",marginBottom:"0.5rem"}}>
+        Hidden Gems of Madrid
+      </div>
+      <div style={{display:"flex",justifyContent:"center",gap:"0.65rem"}}>
+        {["🏴‍☠️","⚓","🗺️","💰","☠️"].map((e,i)=>(
+          <span key={i} style={{fontSize:"1rem",opacity:0.65}}>{e}</span>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 // ─── VIBE METER ───────────────────────────────────────────────────
 const VibeMeter = ({ preferences }) => {
@@ -997,10 +1152,9 @@ function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPl
   }
 
   return (
-    <div style={{
+    <div className="bounty-card" style={{
       background: t.cardBg || "rgba(255,255,255,0.07)",
       border: `1px solid ${t.cardBorder || "rgba(255,255,255,0.12)"}`,
-      borderRadius: 16, overflow: "hidden",
       boxShadow: `0 4px 24px ${t.accentGlow || "rgba(0,0,0,0.3)"}`,
       opacity: visible ? 1 : 0,
       transform: visible ? "translateY(0)" : "translateY(24px)",
@@ -1008,62 +1162,91 @@ function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPl
       filter: swapping ? "opacity(0.3)" : "none",
       pointerEvents: swapping ? "none" : "all",
     }}>
-      {bounty.photo_url && (
-        <img src={bounty.photo_url} alt={bounty.name}
-          style={{ width: "100%", height: 180, objectFit: "cover", display: "block", filter: "brightness(0.85) saturate(0.9)" }} />
-      )}
-      <div style={{ padding: "1.25rem 1.5rem" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.15rem", fontWeight: 600, color: t.textPrimary || "white" }}>
+      {/* Photo header with overlaid badges */}
+      <div style={{ position: "relative", height: 220, background: t.numberBadgeBg || "#0F2747", overflow: "hidden" }}>
+        {bounty.photo_url
+          ? <img src={bounty.photo_url} alt={bounty.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: "brightness(0.78) saturate(0.85)" }} />
+          : <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #0F2747 0%, #1a3a6a 100%)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"3rem" }}>🏴‍☠️</div>
+        }
+        {/* Gradient overlay */}
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(10,20,40,0.9) 0%, rgba(10,20,40,0.2) 50%, transparent 100%)" }} />
+        {/* Top-right action buttons */}
+        <div style={{ position:"absolute", top:10, right:10, display:"flex", gap:6 }}>
+          {onFavorite && (
+            <button onClick={() => onFavorite(bounty)} title={isFavorited?"Remove from favorites":"Save to favorites"} style={{
+              background: isFavorited ? "rgba(255,80,80,0.25)" : "rgba(0,0,0,0.35)",
+              border: `1px solid ${isFavorited ? "rgba(255,80,80,0.5)" : "rgba(255,255,255,0.2)"}`,
+              borderRadius:"50%", width:34, height:34, cursor:"pointer",
+              fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center",
+              backdropFilter:"blur(8px)",
+            }}>{isFavorited ? "❤️" : "🤍"}</button>
+          )}
+          {onAddToPlan && (
+            <button onClick={handleAddToPlan} title="Add to a plan" style={{
+              background: addMsg ? "rgba(80,200,120,0.25)" : "rgba(0,0,0,0.35)",
+              border: `1px solid ${addMsg ? "rgba(80,200,120,0.5)" : "rgba(255,255,255,0.2)"}`,
+              borderRadius:"50%", width:34, height:34, cursor:"pointer",
+              fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center",
+              backdropFilter:"blur(8px)",
+            }}>{addMsg ? "✓" : "+"}</button>
+          )}
+          <div style={{
+            width:34, height:34, borderRadius:"50%",
+            background: t.numberBadgeBg || "#8B2020",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:"0.75rem", fontWeight:700, color:"white",
+            border:"2px solid rgba(255,255,255,0.2)",
+          }}>{index + 1}</div>
+        </div>
+        {/* Pirate name + real name on photo bottom */}
+        <div style={{ position:"absolute", bottom:12, left:14, right:14 }}>
+          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, color:"white", textShadow:"0 2px 8px rgba(0,0,0,0.8)" }}>
             {bounty.pirate_name}
           </div>
-          <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
-            {onFavorite && (
-              <button onClick={() => onFavorite(bounty)} title={isFavorited?"Remove from favorites":"Save to favorites"} style={{
-                background: isFavorited ? "rgba(255,80,80,0.15)" : "rgba(255,255,255,0.07)",
-                border: `1px solid ${isFavorited ? "rgba(255,80,80,0.3)" : "rgba(255,255,255,0.15)"}`,
-                borderRadius:"50%", width:"32px", height:"32px", cursor:"pointer",
-                fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center",
-              }}>{isFavorited ? "❤️" : "🤍"}</button>
-            )}
-            {onAddToPlan && (
-              <button onClick={handleAddToPlan} title="Add to a plan" style={{
-                background: addMsg ? "rgba(80,200,120,0.15)" : "rgba(255,255,255,0.07)",
-                border: `1px solid ${addMsg ? "rgba(80,200,120,0.3)" : "rgba(255,255,255,0.15)"}`,
-                borderRadius:"50%", width:"32px", height:"32px", cursor:"pointer",
-                fontSize:"15px", display:"flex", alignItems:"center", justifyContent:"center",
-              }}>{addMsg ? "✓" : "+"}</button>
-            )}
-            <div style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: t.numberBadgeBg || "#8B2020",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "0.72rem", fontWeight: 700, color: "white",
-            }}>{index + 1}</div>
+          <div style={{ fontSize:"0.78rem", color:"rgba(255,255,255,0.65)", marginTop:2 }}>
+            {bounty.name}{bounty.price_level ? " · " + "💰".repeat(bounty.price_level) : ""}
           </div>
         </div>
-        <div style={{ fontSize: "0.82rem", color: t.textMuted || "rgba(255,255,255,0.5)", marginBottom: "0.85rem" }}>
-          {bounty.name}{bounty.price_level ? " · " + "💰".repeat(bounty.price_level) : ""}
+      </div>
+
+      {/* Card body */}
+      <div style={{ padding:"1.25rem 1.4rem" }}>
+        {/* AI insight callout */}
+        <div className="insight-callout" style={{
+          marginBottom:"1rem",
+          borderLeftColor: t.goldColor || "#D4A96A",
+          background: t.accentGlow || "rgba(212,169,106,0.08)",
+          color: t.textMuted || "rgba(255,255,255,0.72)",
+        }}>
+          "{bounty.hook}"
         </div>
-        <div style={{
-          fontFamily: "'Crimson Text', serif", fontStyle: "italic", fontSize: "1.05rem",
-          color: t.textMuted || "rgba(255,255,255,0.65)", lineHeight: 1.5,
-          borderLeft: `2.5px solid ${t.goldColor || "#D4A96A"}`, paddingLeft: "0.9rem", marginBottom: "1rem",
-        }}>"{bounty.hook}"</div>
-        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: "0.85rem" }}>
-          <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: t.textMuted || "rgba(255,255,255,0.5)" }}>
-            {bounty.rating && <span style={{ color: t.goldColor || "#D4A96A" }}>{"★".repeat(Math.floor(bounty.rating))} {bounty.rating}</span>}
-            {bounty.address && <span>📍 {bounty.address}</span>}
+
+        {/* Rating + address row */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:6, marginBottom:"0.85rem", fontSize:"0.8rem" }}>
+          <div style={{ display:"flex", gap:"0.75rem", alignItems:"center" }}>
+            {bounty.rating && (
+              <span style={{ color: t.goldColor || "#D4A96A", fontWeight:600 }}>
+                {"★".repeat(Math.floor(bounty.rating))}{"☆".repeat(5 - Math.floor(bounty.rating))} {bounty.rating}
+              </span>
+            )}
+            {bounty.address && <span style={{ color: t.textMuted || "rgba(255,255,255,0.5)" }}>📍 {bounty.address}</span>}
           </div>
-          <div style={{ fontSize: "0.78rem", color: t.goldColor || "#D4A96A", fontStyle: "italic" }}>{bounty.send_off}</div>
+          {bounty.send_off && (
+            <div style={{ fontSize:"0.78rem", color: t.goldColor || "#D4A96A", fontStyle:"italic" }}>{bounty.send_off}</div>
+          )}
         </div>
-        <div style={{ display: "flex", gap: "0.75rem" }}>
+
+        {/* CTA row */}
+        <div style={{ display:"flex", gap:"0.75rem" }}>
           <a href={bounty.maps_url} target="_blank" rel="noopener noreferrer" style={{
-            flex: 1, background: t.numberBadgeBg || "#0F2747",
-            color: "white", border: "none", borderRadius: 10,
-            padding: "0.75rem", fontSize: "0.82rem", fontWeight: 500,
-            textAlign: "center", textDecoration: "none",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            flex:1, background:`linear-gradient(135deg, ${t.numberBadgeBg || "#0F2747"} 0%, #1a3a6a 100%)`,
+            color:"white", border:"none", borderRadius:12,
+            padding:"0.8rem", fontSize:"0.85rem", fontWeight:600,
+            textAlign:"center", textDecoration:"none",
+            display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+            boxShadow:"0 4px 14px rgba(0,0,0,0.3)",
+            transition:"transform 0.15s, box-shadow 0.15s",
           }}>⚓ Claim this Bounty</a>
           <ConfirmSwapButton onConfirm={() => onSwap(bounty.place_id)} swapping={swapping} theme={t} />
         </div>
@@ -1217,23 +1400,114 @@ const BASE_CSS = `
   .divider { border:none; border-top:1px solid #E0D4B8; margin:0; }
 
   /* ANIMATIONS */
-  @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes scanPulse { 0% { box-shadow:0 0 0 0 rgba(212,169,106,0.7); } 70% { box-shadow:0 0 0 20px rgba(212,169,106,0); } 100% { box-shadow:0 0 0 0 rgba(212,169,106,0); } }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes scanPulse { 0%{box-shadow:0 0 0 0 rgba(212,169,106,0.7)} 70%{box-shadow:0 0 0 20px rgba(212,169,106,0)} 100%{box-shadow:0 0 0 0 rgba(212,169,106,0)} }
   @keyframes sunPulse { 0%,100%{box-shadow:0 0 60px 20px rgba(255,220,80,0.4)} 50%{box-shadow:0 0 80px 30px rgba(255,220,80,0.55)} }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+  @keyframes floatSlow { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-18px) rotate(2deg)} }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-20px)} 70%{transform:translateY(-7px)} }
+  @keyframes blink { 0%,88%,100%{transform:scaleY(1)} 92%,96%{transform:scaleY(0.05)} }
+  @keyframes sparkle { 0%,100%{opacity:0;transform:scale(0)} 50%{opacity:1;transform:scale(1)} }
+  @keyframes pulseGlow { 0%,100%{box-shadow:0 0 18px rgba(212,169,106,0.25)} 50%{box-shadow:0 0 38px rgba(212,169,106,0.65),0 0 70px rgba(212,169,106,0.2)} }
+  @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+  @keyframes compassSpin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+  @keyframes starTwinkle { 0%,100%{opacity:0.15} 50%{opacity:0.8} }
+  @keyframes chestShake { 0%,100%{transform:rotate(0deg) scale(1)} 25%{transform:rotate(-5deg) scale(1.04)} 75%{transform:rotate(5deg) scale(1.04)} }
   .fu { animation:fadeUp 0.6s ease forwards; opacity:0; }
   .fu1{animation-delay:0.1s} .fu2{animation-delay:0.25s} .fu3{animation-delay:0.4s} .fu4{animation-delay:0.55s}
 
+  /* HERO ILLUSTRATED PANEL */
+  .hero-panel {
+    position:relative; display:flex; align-items:center; justify-content:center;
+    border-radius:24px; overflow:hidden; aspect-ratio:4/5;
+    background:linear-gradient(160deg,#0d1f3c 0%,#1a3a6a 45%,#0a1628 100%);
+    border:2px solid rgba(212,169,106,0.3);
+    box-shadow:0 24px 80px rgba(15,39,71,0.35);
+    animation:pulseGlow 4s ease-in-out infinite;
+  }
+
+  /* PREMIUM SAIL BUTTON */
+  .sail-btn-premium {
+    width:100%; margin-top:1.2rem; border:none; border-radius:14px;
+    padding:1rem; font-size:0.9rem; font-weight:600; letter-spacing:0.08em;
+    cursor:pointer; transition:all 0.25s; text-transform:uppercase;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:linear-gradient(135deg,#0F2747 0%,#1a3a6a 100%);
+    color:white; position:relative; overflow:hidden;
+  }
+  .sail-btn-premium::after {
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.09),transparent);
+    background-size:200% 100%; animation:shimmer 2.5s ease-in-out infinite;
+  }
+  .sail-btn-premium:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 28px rgba(15,39,71,0.45); }
+  .sail-btn-premium:disabled { opacity:0.35; cursor:not-allowed; }
+
+  /* SURPRISE BUTTON */
+  .surprise-btn {
+    width:100%; margin-top:0.65rem; padding:0.85rem; border-radius:14px;
+    border:2px dashed rgba(212,169,106,0.45); background:rgba(212,169,106,0.05);
+    color:#8B6914; font-size:0.85rem; font-weight:600; cursor:pointer;
+    transition:all 0.2s; letter-spacing:0.05em; font-family:'DM Sans',sans-serif;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .surprise-btn:hover { border-color:#D4A96A; background:rgba(212,169,106,0.1); color:#B8860B; transform:translateY(-1px); }
+
+  /* ROPE DIVIDER */
+  .rope-divider { display:flex; align-items:center; gap:1rem; padding:0 3rem; max-width:1200px; margin:0 auto; }
+  .rope-divider::before,.rope-divider::after { content:""; flex:1; height:3px; border-radius:2px; opacity:0.35;
+    background:repeating-linear-gradient(90deg,#C8A84B 0,#C8A84B 8px,#8B6914 8px,#8B6914 14px,#C8A84B 14px,#C8A84B 20px); }
+  .rope-divider span { font-size:1.1rem; opacity:0.5; flex-shrink:0; }
+
+  /* VIBE GRID */
+  .vibe-section { padding:4rem 3rem 5rem; max-width:1200px; margin:0 auto; position:relative; z-index:1; }
+  .vibe-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:2rem; }
+  .vibe-tile { border-radius:18px; padding:1.75rem 1.25rem; text-align:center; cursor:pointer;
+    transition:all 0.22s; position:relative; overflow:hidden; }
+  .vibe-tile:hover { transform:translateY(-5px) scale(1.02); box-shadow:0 16px 48px rgba(0,0,0,0.22); }
+  .vibe-tile-icon { font-size:2.6rem; display:block; margin-bottom:0.6rem; }
+  .vibe-tile-label { font-family:'Playfair Display',serif; font-size:1rem; font-weight:700; display:block; margin-bottom:0.3rem; }
+  .vibe-tile-sub { font-size:0.72rem; opacity:0.6; font-style:italic; display:block; }
+
+  /* CHEST CARDS (SURPRISE SCREEN) */
+  .chest-card { border-radius:20px; padding:2rem 1.25rem 1.75rem; text-align:center; cursor:pointer;
+    transition:all 0.25s; backdrop-filter:blur(10px); }
+  .chest-card:hover { transform:scale(1.05) translateY(-6px); }
+  .chest-card:hover .chest-lid { transform:rotate(-14deg) translateY(-3px); transform-origin:left bottom; transition:transform 0.3s ease; }
+  .chest-lid { transition:transform 0.3s ease; }
+
+  /* BOUNTY CARD (RESULTS) */
+  .bounty-card { border-radius:20px; overflow:hidden; backdrop-filter:blur(12px);
+    transition:transform 0.25s ease, box-shadow 0.25s ease; }
+  .bounty-card:hover { transform:translateY(-3px); }
+
+  /* AI INSIGHT CALLOUT */
+  .insight-callout {
+    border-radius:0 10px 10px 0; padding:0.8rem 1rem; margin:0.75rem 0;
+    font-family:'Crimson Text',serif; font-style:italic; font-size:1.05rem; line-height:1.55;
+    position:relative; border-left-width:3px; border-left-style:solid;
+  }
+  .insight-callout::before { content:"AI PICK"; position:absolute; top:-9px; left:10px;
+    background:#D4A96A; color:#0F2747; font-size:0.5rem; font-family:'DM Sans',sans-serif;
+    font-style:normal; font-weight:700; letter-spacing:0.15em; padding:2px 7px; border-radius:4px; }
+
   @media (max-width:900px) {
     .hero { grid-template-columns:1fr; padding:5rem 1.5rem 2rem; gap:2rem; }
+    .hero-panel { aspect-ratio:16/9; min-height:260px; }
     .how-cards { grid-template-columns:1fr; }
     .routes-grid { grid-template-columns:repeat(2,1fr); }
+    .vibe-grid { grid-template-columns:repeat(2,1fr); }
     .navbar { padding:0 1.5rem; }
     .nav-links { display:none; }
     .reveal-wrap { padding:90px 1.25rem 3rem; }
     .hunting-wrap { padding:90px 1.25rem 3rem; }
-    .how-section,.routes-section { padding:4rem 1.5rem; }
+    .how-section,.routes-section,.vibe-section { padding:3rem 1.5rem; }
+    .rope-divider { padding:0 1.5rem; }
   }
-  @media (max-width:600px) { .routes-grid { grid-template-columns:1fr; } }
+  @media (max-width:600px) {
+    .routes-grid { grid-template-columns:1fr; }
+    .vibe-grid { grid-template-columns:1fr 1fr; }
+  }
 `;
 
 const ROUTES_DATA = [
@@ -1941,8 +2215,11 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-                <button className="sail-btn" onClick={() => startHunt()} disabled={!canSail}>
-                  <span className="sail-gold">🧭</span> FIND MY TREASURES <span className="sail-gold">→</span>
+                <button className="sail-btn-premium" onClick={() => startHunt()} disabled={!canSail}>
+                  <span style={{color:"#D4A96A"}}>🧭</span> FIND MY TREASURES <span style={{color:"#D4A96A",marginLeft:4}}>→</span>
+                </button>
+                <button className="surprise-btn" onClick={() => setScreen("surprise")}>
+                  🎲 Surprise Me — Let the Navigator Decide
                 </button>
                 <p className="sail-tagline">🗺️ 3 hidden gems · Pirate descriptions · Google Maps links</p>
                 {error && <div className="err-box">⚠️ {error}</div>}
@@ -1956,9 +2233,7 @@ export default function App() {
             </div>
 
             <div style={{ position:"relative", zIndex:1 }} className="fu fu2">
-              <div className="map-wrap tall">
-                <TreasureMapSVG bounties={[]} scanning={false}/>
-              </div>
+              <HeroIllustratedPanel />
             </div>
           </section>
 
@@ -2002,39 +2277,120 @@ export default function App() {
             </div>
           </section>
 
+          <div className="rope-divider"><span>⚓</span></div>
+
+          <section className="vibe-section" id="vibes">
+            <h2 className="sec-headline">Choose Your Vibe</h2>
+            <p className="sec-sub">Pick a mood and let the navigator chart your course.</p>
+            <div className="vibe-grid">
+              {Object.entries(VIBE_THEMES).map(([key,t])=>(
+                <div key={key} className="vibe-tile"
+                  style={{background:t.isDay?"rgba(250,246,234,0.95)":t.cardBg, border:`1.5px solid ${t.cardBorder}`, color:t.isDay?"#2a1a08":t.textPrimary}}
+                  onClick={()=>startHunt(`${t.tagline} Find hidden spots in Madrid matching this vibe.`, null)}>
+                  <span className="vibe-tile-icon">{t.icon}</span>
+                  <span className="vibe-tile-label" style={{color:t.isDay?"#2a1a08":t.textPrimary}}>{t.label}</span>
+                  <span className="vibe-tile-sub" style={{color:t.isDay?"#8a7a5a":t.textMuted}}>{t.tagline}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <footer className="footer">Made with ⚓ by <strong>Pirates</strong> · RUMBO © 2025 · Google Hackathon</footer>
+        </div>
+      )}
+
+      {/* ===== SURPRISE SCREEN ===== */}
+      {screen === "surprise" && (
+        <div style={{position:"relative",minHeight:"100vh"}}>
+          <div style={{position:"fixed",inset:0,zIndex:0,background:"linear-gradient(180deg,#070d1a 0%,#0d1f3c 40%,#0a1628 100%)",pointerEvents:"none"}}>
+            <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
+              {Array.from({length:90},(_,i)=>(
+                <circle key={i} cx={`${(Math.sin(i*137.5)*0.5+0.5)*100}%`} cy={`${(Math.cos(i*97.3)*0.5+0.5)*100}%`}
+                  r={0.4+(i%4)*0.35} fill="white"
+                  style={{animation:`starTwinkle ${1.8+(i%6)*0.4}s ${i*0.15}s ease-in-out infinite`}}/>
+              ))}
+            </svg>
+          </div>
+          <div style={{position:"relative",zIndex:1,maxWidth:900,margin:"0 auto",padding:"110px 2rem 4rem",textAlign:"center"}}>
+            <MascotSVG size={110} animation="bounce" extraStyle={{margin:"0 auto 1rem"}}/>
+            <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"clamp(1.8rem,3.5vw,2.6rem)",color:"#F0DFA0",marginBottom:"0.4rem"}}>
+              Choose Your Hunt, Captain
+            </h2>
+            <p style={{color:"rgba(240,223,160,0.5)",fontStyle:"italic",marginBottom:"2.5rem",fontSize:"0.95rem"}}>
+              Pick a vibe — the navigator finds your treasure
+            </p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"1.25rem",marginBottom:"2.5rem"}}>
+              {[
+                {vibe:"wild",  icon:"🔥", title:"Wild Night Out",     sub:"Clubs, rooftops, hidden bars", desc:"A wild night out in Madrid with an energetic group, clubs, rooftops, and hidden bars locals actually go to"},
+                {vibe:"romantic",icon:"🌹",title:"Romantic Evening",  sub:"Intimate, candlelit, unforgettable", desc:"A romantic evening for two, intimate hidden restaurants and bars with special atmosphere in Madrid, avoiding tourists"},
+                {vibe:"foodie",icon:"🍽️",title:"Foodie Hunt",        sub:"Local tables, authentic flavours", desc:"A foodie hunt for the best hidden local restaurants and tapas bars that only locals know in Madrid"},
+              ].map(({vibe,icon,title,sub,desc})=>(
+                <div key={vibe} className="chest-card"
+                  onClick={()=>startHunt(desc,null)}
+                  style={{background:VIBE_THEMES[vibe].cardBg,border:`2px solid ${VIBE_THEMES[vibe].cardBorder}`}}>
+                  <svg width="68" height="58" viewBox="0 0 68 58" className="chest-lid" style={{display:"block",margin:"0 auto 1rem"}}>
+                    <rect x="6" y="30" width="56" height="24" rx="5" fill="#3A1F08"/>
+                    <path d="M6,30 Q34,18 62,30 L62,36 Q34,24 6,36 Z" fill="#4A2A0A"/>
+                    <rect x="6" y="30" width="56" height="3" rx="1.5" fill="#C8A84B"/>
+                    <rect x="6" y="50" width="56" height="3" rx="1.5" fill="#C8A84B" opacity="0.7"/>
+                    <rect x="6" y="38" width="56" height="4" rx="2" fill="#C8A84B"/>
+                    <rect x="31" y="28" width="6" height="5" rx="1.5" fill="#C8A84B"/>
+                    <path d="M33,28 Q33,23 34,23 Q35,23 35,28" stroke="#C8A84B" strokeWidth="1.8" fill="none"/>
+                    <ellipse cx="50" cy="52" rx="20" ry="4" fill="#F0C040" opacity="0.12"/>
+                    <circle cx="22" cy="36" r="5" fill="white"/>
+                    <circle cx="46" cy="36" r="5" fill="white"/>
+                    <circle cx="22.8" cy="36" r="2.8" fill="#1a1a2e"/>
+                    <circle cx="46.8" cy="36" r="2.8" fill="#1a1a2e"/>
+                    <circle cx="23.8" cy="34.8" r="1" fill="white"/>
+                    <circle cx="47.8" cy="34.8" r="1" fill="white"/>
+                  </svg>
+                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:"1.05rem",color:VIBE_THEMES[vibe].textPrimary,marginBottom:"0.35rem",fontWeight:600}}>{icon} {title}</div>
+                  <div style={{fontSize:"0.76rem",color:VIBE_THEMES[vibe].textMuted,fontStyle:"italic"}}>{sub}</div>
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>setScreen("brief")} style={{background:"transparent",border:"1px solid rgba(240,223,160,0.2)",color:"rgba(240,223,160,0.45)",borderRadius:40,padding:"0.65rem 1.8rem",cursor:"pointer",fontSize:"0.85rem",transition:"all 0.2s",fontFamily:"'DM Sans',sans-serif"}}>
+              ← Back to Search
+            </button>
+          </div>
         </div>
       )}
 
       {/* ===== HUNTING SCREEN ===== */}
       {screen === "hunting" && (
-        <div style={{ position:"relative", ...revealPageStyle }}>
-          <div style={{
-            position:"fixed", inset:0, zIndex:0,
-            background:"linear-gradient(180deg,#0a0418 0%,#1a0630 40%,#2d0a4e 70%,#1a0a20 100%)",
-            pointerEvents:"none",
-          }}>
+        <div style={{position:"relative",...revealPageStyle}}>
+          <div style={{position:"fixed",inset:0,zIndex:0,background:"linear-gradient(180deg,#070d1a 0%,#0d1f3c 45%,#0a1628 100%)",pointerEvents:"none"}}>
             <svg style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>
-              {Array.from({length:80},(_,i)=>(
-                <circle key={i} cx={`${(Math.sin(i*137.5)*0.5+0.5)*100}%`}
-                  cy={`${(Math.cos(i*97.3)*0.5+0.5)*60}%`}
-                  r={0.5+(i%4)*0.3} fill="white" opacity={0.2+(i%5)*0.1}/>
+              {Array.from({length:90},(_,i)=>(
+                <circle key={i} cx={`${(Math.sin(i*137.5)*0.5+0.5)*100}%`} cy={`${(Math.cos(i*97.3)*0.5+0.5)*75}%`}
+                  r={0.4+(i%4)*0.35} fill="white"
+                  style={{animation:`starTwinkle ${2+(i%5)*0.5}s ${i*0.12}s ease-in-out infinite`}}/>
               ))}
             </svg>
           </div>
           <div className="hunting-wrap">
-            <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"2rem",color:"#F0DFA0",textAlign:"center"}}>
+            <div style={{textAlign:"center",marginBottom:"0.25rem"}}>
+              <MascotSVG size={130} animation="bounce"/>
+            </div>
+            <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"clamp(1.6rem,3vw,2.2rem)",color:"#F0DFA0",textAlign:"center",marginBottom:"0.4rem"}}>
               Scanning the Seas of Madrid…
             </h2>
-            <p style={{color:"rgba(240,223,160,0.6)",fontStyle:"italic",textAlign:"center",marginTop:"-1.5rem"}}>
+            <p style={{color:"rgba(240,223,160,0.5)",fontStyle:"italic",textAlign:"center",marginBottom:"1.5rem",fontSize:"0.9rem"}}>
               The navigator is charting your course
             </p>
-            <div className="map-wrap tall" style={{width:"100%"}}>
-              <TreasureMapSVG bounties={[]} scanning={true}/>
+            <div style={{position:"relative",width:88,height:88,margin:"0 auto 1.5rem"}}>
+              <div style={{position:"absolute",inset:0,borderRadius:"50%",border:"2px solid rgba(212,169,106,0.35)",animation:"pulseGlow 1.8s ease-in-out infinite"}}/>
+              <div style={{position:"absolute",inset:10,borderRadius:"50%",border:"1.5px solid rgba(212,169,106,0.55)",animation:"pulseGlow 1.8s 0.45s ease-in-out infinite"}}/>
+              <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2.2rem",animation:"compassSpin 5s linear infinite"}}>🧭</div>
             </div>
-            <p style={{fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"rgba(240,223,160,0.7)",fontSize:"1rem",textAlign:"center"}}>
+            <p style={{fontFamily:"'Crimson Text',serif",fontStyle:"italic",color:"rgba(240,223,160,0.8)",fontSize:"1.1rem",textAlign:"center",minHeight:"1.8em",transition:"opacity 0.4s ease",marginBottom:"1.25rem"}}>
               {scanMsg}
             </p>
+            <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+              {SCAN_MESSAGES.map((msg,i)=>(
+                <div key={i} style={{width:8,height:8,borderRadius:"50%",transition:"background 0.4s",background:scanMsg===msg?"#D4A96A":"rgba(212,169,106,0.2)"}}/>
+              ))}
+            </div>
           </div>
         </div>
       )}
