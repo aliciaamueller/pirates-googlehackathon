@@ -6,12 +6,14 @@ import os
 import json
 import time
 import hashlib
+from agent import get_agent_response, CREW
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 app = Flask(__name__)
 CORS(app)
 
 MAPS_KEY = os.getenv("MAPS_API_KEY")
+print(f"[startup] MAPS_KEY loaded: {bool(MAPS_KEY)} | value prefix: {(MAPS_KEY or '')[:8]}")
 _cache = {}
 
 def cache_key(*args):
@@ -92,16 +94,22 @@ VIBE_TO_TYPE = {
     "cultural": "museum", "foodie": "restaurant", "adventure": "park",
 }
 
-def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2000):
+def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500):
     ck = cache_key("places", vibe, round(lat, 3), round(lng, 3))
     if ck in _cache:
         return _cache[ck]
     place_type = VIBE_TO_TYPE.get(vibe, "bar")
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-    params = {"location": f"{lat},{lng}", "radius": 1200, "type": place_type, "opennow": True, "key": MAPS_KEY}
+    params = {"location": f"{lat},{lng}", "radius": radius, "type": place_type, "key": MAPS_KEY}
     resp = requests.get(url, params=params, timeout=8)
-    results = resp.json().get("results", [])[:15]
-    _cache[ck] = results
+    data = resp.json()
+    status = data.get("status", "UNKNOWN")
+    print(f"[Places API] status={status} vibe={vibe} lat={lat} lng={lng} key_set={bool(MAPS_KEY)}")
+    if status not in ("OK", "ZERO_RESULTS"):
+        raise Exception(f"Places API error: {status} — {data.get('error_message', '')}")
+    results = data.get("results", [])[:15]
+    if results:
+        _cache[ck] = results
     return results
 
 def generate_dossiers(places, preferences, exclude_ids=None, count=3):
@@ -175,9 +183,12 @@ def hunt():
         return jsonify({"error": "No description provided"}), 400
 
     preferences = extract_preferences(crew_description, roles=roles, spend_per_person=spend_per_person)
-    places = search_places(preferences["vibe"], lat, lng)
+    try:
+        places = search_places(preferences["vibe"], lat, lng)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
     if not places:
-        return jsonify({"error": "No places found nearby"}), 404
+        return jsonify({"error": "No places found nearby (ZERO_RESULTS) — try a different neighbourhood or vibe"}), 404
 
     try:
         dossiers = generate_dossiers(places, preferences)
@@ -233,6 +244,31 @@ def swap():
         return jsonify({"error": "No replacement found nearby"}), 404
 
     return jsonify({"bounty": bounties[0]})
+
+@app.route("/api/crew-react", methods=["POST"])
+def crew_react():
+    data = request.json or {}
+    bounties = data.get("bounties", [])
+    preferences = data.get("preferences", {})
+
+    names = [b.get("pirate_name") or b.get("name") for b in bounties if b.get("pirate_name") or b.get("name")]
+    vibe = preferences.get("vibe", "unknown")
+    budget = preferences.get("budget", "unknown")
+
+    if names:
+        captain_message = f"We're bound for {', '.join(names)} tonight — a {vibe} run on a {budget} budget. What say you?"
+    else:
+        captain_message = f"We've plotted a {vibe} course for tonight on a {budget} budget. What say you?"
+
+    reactions = {}
+    for agent_id, agent in CREW.items():
+        try:
+            text = get_agent_response(agent_id, [], captain_message)
+            reactions[agent_id] = {"name": agent["name"], "text": text}
+        except Exception:
+            pass
+
+    return jsonify({"reactions": reactions})
 
 @app.route("/api/health", methods=["GET"])
 def health():
