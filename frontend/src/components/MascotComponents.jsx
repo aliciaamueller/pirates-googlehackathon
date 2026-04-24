@@ -65,10 +65,10 @@ export const MascotSVG = ({ size = 140, animation = "float", style: extraStyle =
 export function TreasureChestMascot({ variant = "feast", selected = false, animationDelay = "0s" }) {
   const uid = useId().replace(/:/g, "");
   const T = {
-    feast: { w1: "#4A2A0A", w2: "#2a1506", gold: "#C8A84B", hat: "#0d1a2e", seam: "#2a1506" },
+    feast: { w1: "#2a1a00", w2: "#150e00", gold: "#F0C040", hat: "#0a0800", seam: "#3a2a00" },
     culture: { w1: "#2a4a52", w2: "#1a3038", gold: "#6ab4c4", hat: "#0a1f28", seam: "#1a3038" },
     moonlight: { w1: "#4a3258", w2: "#2a1838", gold: "#b894d4", hat: "#1a0a28", seam: "#2a1838" },
-    surprise: { w1: "#2a1a00", w2: "#150e00", gold: "#F0C040", hat: "#0a0800", seam: "#3a2a00" },
+    surprise: { w1: "#082a1a", w2: "#041510", gold: "#00D4AA", hat: "#020d08", seam: "#0a3020" },
   }[variant] || {
     w1: "#4A2A0A",
     w2: "#2a1506",
@@ -131,6 +131,73 @@ export function TreasureChestMascot({ variant = "feast", selected = false, anima
         <path d="M40,58 Q50,65 60,58" stroke={T.gold} strokeWidth="2" fill="none" strokeLinecap="round" />
         <circle cx="20" cy="42" r="1.5" fill="#F0C040" opacity="0.7" style={{ animation: "sparkle 2.2s 0.3s ease-in-out infinite" }} />
         <circle cx="80" cy="44" r="1.2" fill="#F0C040" opacity="0.6" style={{ animation: "sparkle 2.2s 1s ease-in-out infinite" }} />
+      </svg>
+    </div>
+  );
+}
+
+export function PirateFigureSVG({ size = 80, style: extraStyle = {} }) {
+  return (
+    <div style={{ width: size, height: size * 1.35, display: "inline-block", animation: "float 3.8s ease-in-out infinite", ...extraStyle }}>
+      <svg viewBox="0 0 80 108" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        {/* Bicorne hat */}
+        <path d="M22,38 L40,16 L58,38 L54,43 L26,43 Z" fill="#0d1a2e"/>
+        <rect x="20" y="41" width="40" height="2.5" rx="1" fill="#C8A84B"/>
+        {/* Skull on hat */}
+        <circle cx="40" cy="28" r="4.5" fill="#F7F4EE" opacity="0.9"/>
+        <circle cx="38.5" cy="28.5" r="1.1" fill="#0d1a2e"/>
+        <circle cx="41.5" cy="28.5" r="1.1" fill="#0d1a2e"/>
+        <path d="M38,30.5 Q40,32.5 42,30.5" stroke="#0d1a2e" strokeWidth="0.7" fill="none"/>
+        <line x1="36.5" y1="32" x2="38.5" y2="34" stroke="#F7F4EE" strokeWidth="1" opacity="0.6"/>
+        <line x1="43.5" y1="32" x2="41.5" y2="34" stroke="#F7F4EE" strokeWidth="1" opacity="0.6"/>
+        {/* Face */}
+        <circle cx="40" cy="54" r="13" fill="#f0be8a"/>
+        {/* Eye patch left */}
+        <ellipse cx="33" cy="51" rx="5" ry="3.8" fill="#0d1a2e"/>
+        <line x1="27" y1="49" x2="38" y2="49" stroke="#0d1a2e" strokeWidth="2"/>
+        {/* Right eye */}
+        <circle cx="48" cy="51" r="3.2" fill="#0d1a2e"/>
+        <circle cx="49.2" cy="49.8" r="1.1" fill="white"/>
+        {/* Nose */}
+        <path d="M39,57 Q40,59 41,57" stroke="#c08060" strokeWidth="1" fill="none"/>
+        {/* Mustache */}
+        <path d="M34.5,60 Q37,62.5 40,60.5 Q43,62.5 45.5,60" fill="#2a1a08" stroke="#2a1a08" strokeWidth="0.4"/>
+        {/* Smirk */}
+        <path d="M37,63 Q41,67 45,64" stroke="#7a3d15" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+        {/* Beard */}
+        <path d="M28,60 Q29,72 40,75 Q51,72 52,60 Q45,66 40,67 Q35,66 28,60 Z" fill="#2a1a08" opacity="0.55"/>
+        {/* Coat body */}
+        <path d="M20,67 L16,108 L64,108 L60,67 Q51,75 40,75 Q29,75 20,67 Z" fill="#1a1a2e"/>
+        {/* Coat lapels / shirt */}
+        <path d="M28,70 L40,90 L52,70 Q46,76 40,78 Q34,76 28,70 Z" fill="#2d3a5e" opacity="0.7"/>
+        {/* Gold trim lines */}
+        <path d="M20,67 Q18,80 16,108" stroke="#C8A84B" strokeWidth="1.2" opacity="0.5"/>
+        <path d="M60,67 Q62,80 64,108" stroke="#C8A84B" strokeWidth="1.2" opacity="0.5"/>
+        {/* Belt */}
+        <rect x="16" y="89" width="48" height="5.5" fill="#C8A84B"/>
+        <rect x="36" y="87" width="8" height="9.5" rx="1.5" fill="#D4A96A"/>
+        <circle cx="40" cy="91.5" r="2.2" fill="#8B6914"/>
+        {/* Coat buttons */}
+        <circle cx="40" cy="80" r="1.8" fill="#C8A84B"/>
+        <circle cx="40" cy="86" r="1.8" fill="#C8A84B"/>
+        {/* Left arm */}
+        <path d="M20,67 Q10,72 7,86" stroke="#1a1a2e" strokeWidth="10" strokeLinecap="round"/>
+        <circle cx="7" cy="89" r="5" fill="#f0be8a"/>
+        {/* Rum bottle in left hand */}
+        <rect x="0" y="79" width="7" height="14" rx="2" fill="#1a5c1a"/>
+        <rect x="1.5" y="74" width="4" height="7" rx="1.5" fill="#1a5c1a"/>
+        <rect x="1.5" y="73" width="4" height="2.5" rx="1" fill="#C8A84B"/>
+        <ellipse cx="3.5" cy="86" rx="2" ry="1.5" fill="#2d8a12" opacity="0.5"/>
+        {/* Right arm */}
+        <path d="M60,67 Q70,72 73,84" stroke="#1a1a2e" strokeWidth="10" strokeLinecap="round"/>
+        <circle cx="73" cy="87" r="5" fill="#f0be8a"/>
+        {/* Cutlass in right hand */}
+        <circle cx="79" cy="86" r="3.8" fill="#C8A84B"/>
+        <rect x="77.5" y="86" width="3" height="20" rx="1" fill="#b0b4c8"/>
+        <rect x="73.5" y="88" width="11" height="2.5" rx="1" fill="#C8A84B"/>
+        {/* Boot tips */}
+        <path d="M22,108 Q18,108 18,104 L20,98" stroke="#2a1206" strokeWidth="8" strokeLinecap="round"/>
+        <path d="M58,108 Q62,108 62,104 L60,98" stroke="#2a1206" strokeWidth="8" strokeLinecap="round"/>
       </svg>
     </div>
   );

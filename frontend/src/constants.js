@@ -50,7 +50,7 @@ export const CHEST_OPTIONS = [
     variant: "feast",
     title: "Feast & Grog",
     subtitle: "Restaurants & bars",
-    accent: "#C8A84B",
+    accent: "#F0C040",
   },
   {
     id: "museums",
@@ -71,7 +71,7 @@ export const CHEST_OPTIONS = [
     variant: "surprise",
     title: "Surprise Me",
     subtitle: "Gemini picks everything",
-    accent: "#F0C040",
+    accent: "#00D4AA",
   },
 ];
 
@@ -201,12 +201,45 @@ export const VIBE_THEMES = {
 };
 
 export const ROUTES_DATA = [
-  { title:"Hidden Taverns of Malasaña", badge:"Local Legend", emoji:"🍺", a:"#1a0e04", b:"#0d0804", meta:"Malasaña · Food & Drink", barrio:"Malasaña", huntDesc:"Friends looking for hidden local taverns and bars with authentic character, avoiding tourist chains in Malasaña" },
-  { title:"Moonlit Terraces of Salamanca", badge:"Night Voyage", emoji:"🌙", a:"#04081a", b:"#02050f", meta:"Salamanca · Drinks & Views", barrio:"Salamanca", huntDesc:"Friends going out for drinks on hidden rooftop terraces and bars with night views in Salamanca" },
-  { title:"Broke Crew's Feast in Chamberí", badge:"Pirate Budget", emoji:"🪙", a:"#0a1004", b:"#060a02", meta:"Chamberí · Budget Feast", barrio:"Chamberí", huntDesc:"Broke students who want cheap authentic local food and drinks, no tourist spots in Chamberí" },
-  { title:"Secret Port of La Latina", badge:"Date Voyage", emoji:"🌹", a:"#1a040e", b:"#0f0208", meta:"La Latina · Romantic", barrio:"La Latina", huntDesc:"A couple on a date wanting intimate, cozy hidden spots with atmosphere in La Latina" },
-  { title:"Ancient Scrolls of Sol", badge:"Cultural Raid", emoji:"📜", a:"#0e0a04", b:"#08060202", meta:"Centro · Culture & History", barrio:"Sol / Centro", huntDesc:"Culture lovers looking for hidden historical spots, local galleries and character-filled places in Madrid Centro" },
-  { title:"Speakeasy Run in Chueca", badge:"Secret Cove", emoji:"🍸", a:"#04101a", b:"#020a12", meta:"Chueca · Cocktails", barrio:"Chueca", huntDesc:"A group looking for secret cocktail bars and speakeasies with hidden entrances in Chueca" },
+  { title:"Hidden Taverns of Malasaña", badge:"Local Legend", emoji:"🍺", meta:"Malasaña · Food & Drink", barrio:"Malasaña", huntDesc:"Friends looking for hidden local taverns and bars with authentic character, avoiding tourist chains in Malasaña" },
+  { title:"Moonlit Terraces of Salamanca", badge:"Night Voyage", emoji:"🌙", meta:"Salamanca · Drinks & Views", barrio:"Salamanca", huntDesc:"Friends going out for drinks on rooftop terraces and bars with night views in Salamanca" },
+  { title:"Broke Crew's Feast in Chamberí", badge:"Pirate Budget", emoji:"🪙", meta:"Chamberí · Budget Feast", barrio:"Chamberí", huntDesc:"Broke students who want cheap authentic local food and drinks, no tourist spots in Chamberí" },
+  { title:"Secret Port of La Latina", badge:"Date Voyage", emoji:"🌹", meta:"La Latina · Romantic", barrio:"La Latina", huntDesc:"A couple on a date wanting intimate, cozy hidden spots with atmosphere in La Latina" },
+  { title:"Ancient Scrolls of Sol", badge:"Cultural Raid", emoji:"📜", meta:"Centro · Culture & History", barrio:"Sol / Centro", huntDesc:"Culture lovers looking for hidden historical spots, local galleries and character-filled places in Madrid Centro" },
+  { title:"Speakeasy Run in Chueca", badge:"Secret Cove", emoji:"🍸", meta:"Chueca · Cocktails", barrio:"Chueca", huntDesc:"A group looking for secret cocktail bars and speakeasies with hidden entrances in Chueca" },
+  { title:"Sky High — Rooftop Madrid", badge:"Above the Clouds", emoji:"🏙️", meta:"Madrid · Rooftop Terraces", barrio:"Sol / Centro", huntDesc:"Find the best rooftop terraces and sky bars in central Madrid with views over the city, locals-only spots" },
+  { title:"Sunday Brunch in Salamanca", badge:"Slow Morning", emoji:"☕", meta:"Salamanca · Weekend Brunch", barrio:"Salamanca", huntDesc:"A relaxed Sunday brunch crawl in Salamanca, looking for hidden café-restaurant spots with good food and atmosphere" },
+  { title:"Underground Lavapiés", badge:"Off the Map", emoji:"🎨", meta:"Lavapiés · Art & Craft Beer", barrio:"Lavapiés", huntDesc:"Looking for alternative bars, craft beer spots and street-art adjacent venues in Lavapiés, the most multicultural barrio in Madrid" },
+];
+
+export const FAN_FAVOURITES = [
+  {
+    name: "Sala Equis",
+    barrio: "La Latina",
+    heat: "SCENE LEGEND",
+    platform: "TikTok & Instagram",
+    desc: "A 1930s adult cinema transformed into a cult bar with a terrace pool. The most-filmed interior in Madrid right now.",
+    tags: ["#MadridVibes", "#CineBar", "#HiddenMadrid"],
+    huntDesc: "Find places near Sala Equis in La Latina with a similar cinematic, artistic underground bar atmosphere — character-filled hidden gems",
+  },
+  {
+    name: "Bodega de los Secretos",
+    barrio: "Sol / Centro",
+    heat: "HIDDEN ICON",
+    platform: "Instagram & TikTok",
+    desc: "A restaurant built inside 17th-century underground caves. Candles, stone arches, and food that matches the setting.",
+    tags: ["#UndergroundMadrid", "#DateNight", "#MadridEats"],
+    huntDesc: "Find similar atmospheric underground or cave-style restaurants and bars in Madrid Centro with historical character and excellent food",
+  },
+  {
+    name: "El Lateral – Castellana",
+    barrio: "Castellana",
+    heat: "LOCAL STAPLE",
+    platform: "Instagram",
+    desc: "The terrace that Madrid's food creators keep returning to. Montaditos done right, always packed on weekends.",
+    tags: ["#MadridTerrace", "#Tapas", "#WeekendMadrid"],
+    huntDesc: "Find the best terrace spots and tapas bars near Castellana in Madrid, popular with locals, hidden gems with great outdoor seating",
+  },
 ];
 
 export const VIBE_CARD_ANIM = {

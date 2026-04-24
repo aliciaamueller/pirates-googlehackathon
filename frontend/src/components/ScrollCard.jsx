@@ -19,12 +19,30 @@ export function ConfirmSwapButton({ onConfirm, swapping, theme }) {
   );
 }
 
+function getCrowdLevel(bounty) {
+  const hour = new Date().getHours();
+  const day = new Date().getDay();
+  const isWeekend = day === 0 || day === 6;
+  const isEvening = hour >= 19 && hour <= 23;
+  const isLunch = hour >= 12 && hour <= 15;
+  const reviews = bounty.user_ratings_total || 200;
+  let level = reviews > 800 ? 3 : reviews > 300 ? 2 : 1;
+  if (isEvening) level = Math.min(3, level + 1);
+  if (isWeekend && isEvening) level = 3;
+  else if (isLunch) level = Math.min(3, level + 1);
+  if (level === 1) return { label: "Quiet now", color: "#51cf66" };
+  if (level === 2) return { label: "Getting busy", color: "#fcc419" };
+  return { label: "Packed", color: "#ff6b6b" };
+}
+
 // ─── SCROLL CARD ──────────────────────────────────────────────────
 export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vibe, onAddToPlan, onFavorite, isFavorited }) {
   const t = theme || {};
   const [addMsg, setAddMsg] = useState("");
   const [showEs, setShowEs] = useState(false);
   const anim = VIBE_CARD_ANIM[vibe] || VIBE_CARD_ANIM.chill;
+  const crowd = getCrowdLevel(bounty);
+  const streetViewUrl = bounty.lat && bounty.lng ? `https://www.google.com/maps?layer=c&cbll=${bounty.lat},${bounty.lng}` : null;
 
   async function handleAddToPlan() {
     if (onAddToPlan) {
@@ -146,6 +164,12 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
             )}
           </div>
         )}
+        {/* Crowd meter */}
+        <div style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"0.18rem 0.55rem", borderRadius:20, background:`${crowd.color}18`, border:`1px solid ${crowd.color}45`, marginBottom:"0.5rem" }}>
+          <span style={{ fontSize:"0.5rem", color:crowd.color }}>●</span>
+          <span style={{ fontSize:"0.68rem", fontWeight:600, color:crowd.color, letterSpacing:"0.04em" }}>{crowd.label}</span>
+        </div>
+
         {/* Rating + address row */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:6, marginBottom:"0.85rem", fontSize:"0.8rem" }}>
           <div style={{ display:"flex", gap:"0.75rem", alignItems:"center" }}>
@@ -162,7 +186,7 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
         </div>
 
         {/* CTA row */}
-        <div style={{ display:"flex", gap:"0.75rem" }}>
+        <div style={{ display:"flex", gap:"0.6rem" }}>
           <a href={bounty.maps_url} target="_blank" rel="noopener noreferrer" style={{
             flex:1, background:`linear-gradient(135deg, ${t.numberBadgeBg || "#0F2747"} 0%, #1a3a6a 100%)`,
             color:"white", border:"none", borderRadius:12,
@@ -172,6 +196,22 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
             boxShadow:"0 4px 14px rgba(0,0,0,0.3)",
             transition:"transform 0.15s, box-shadow 0.15s",
           }}>⚓ Claim this Bounty</a>
+          {bounty.website && (
+            <a href={bounty.website} target="_blank" rel="noopener noreferrer" title="Reserve a table" style={{
+              background:"rgba(81,207,102,0.1)", border:"1px solid rgba(81,207,102,0.3)",
+              color:"#51cf66", borderRadius:10, padding:"0.75rem 0.7rem",
+              fontSize:"0.78rem", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap",
+              textDecoration:"none", display:"flex", alignItems:"center", justifyContent:"center", gap:3,
+            }}>📅 Reserve</a>
+          )}
+          {streetViewUrl && (
+            <a href={streetViewUrl} target="_blank" rel="noopener noreferrer" title="Street View" style={{
+              background:"rgba(255,255,255,0.06)", border:`1px solid ${t.cardBorder||"rgba(255,255,255,0.15)"}`,
+              color:t.textMuted||"rgba(255,255,255,0.55)", borderRadius:10, padding:"0.75rem 0.7rem",
+              fontSize:"0.8rem", cursor:"pointer", whiteSpace:"nowrap", textDecoration:"none",
+              display:"flex", alignItems:"center", justifyContent:"center",
+            }}>👁</a>
+          )}
           <ConfirmSwapButton onConfirm={() => onSwap(bounty.place_id)} swapping={swapping} theme={t} />
         </div>
       </div>

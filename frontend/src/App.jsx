@@ -5,14 +5,14 @@ import { supabase } from "./supabase";
 import {
   BARRIOS, CREW_ROLES, CHEST_OPTIONS, SORT_OPTIONS,
   CLUB_DAY_OPTIONS, CLUB_AGE_OPTIONS, HUNT_STAGES,
-  MADRID_CENTER, VIBE_THEMES, ROUTES_DATA,
+  MADRID_CENTER, VIBE_THEMES, ROUTES_DATA, FAN_FAVOURITES,
 } from "./constants";
 import { BASE_CSS } from "./styles";
 
 // ─── Components ───────────────────────────────────────────────────
 import { RealMap } from "./components/MapComponents";
 import {
-  MascotSVG, TreasureChestMascot,
+  MascotSVG, TreasureChestMascot, PirateFigureSVG,
   BriefHeroStarfield, BriefHeroFloatingDecor, BriefHeroFooterIcons,
 } from "./components/MascotComponents";
 import { SkyBackground } from "./components/SkyBackground";
@@ -30,13 +30,18 @@ import { PlansPanel, formatPlanDateTime } from "./components/PlansPanel";
 const API = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 /** Crew mode: no free-text box — we synthesize a clear brief for the API from chips + chest */
-function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clubAge, crewSize }) {
+function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clubAge, crewSize, mealType, cuisine, huntDuration }) {
   const chest = CHEST_OPTIONS.find((c) => c.id === categoryId);
   const chestLine = chest
     ? `Voyage: ${chest.title} — ${chest.subtitle}.`
     : `Voyage category: ${categoryId}.`;
   const parts = [chestLine];
   if (crewSize) parts.push(crewSize === 1 ? "Solo traveller — just one person." : `Group of ${crewSize} people.`);
+  if (categoryId === "restaurants_bars") {
+    if (mealType === "food") parts.push("Looking for restaurants and food spots only — no bars.");
+    else if (mealType === "drinks") parts.push("Looking for bars and drink venues only — no restaurants.");
+    if (cuisine && cuisine !== "any") parts.push(`Cuisine preference: ${cuisine}.`);
+  }
   if (barrio?.name) parts.push(`Area focus: ${barrio.name}.`);
   if (roleLabels.length) parts.push(`Crew archetypes: ${roleLabels.join(", ")}.`);
   const sortLabel = SORT_OPTIONS.find((s) => s.id === sortMode)?.label || sortMode;
@@ -44,6 +49,10 @@ function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clu
   if (categoryId === "clubs" && clubDay && clubAge) {
     const ageLabel = CLUB_AGE_OPTIONS.find((a) => a.id === clubAge)?.label || clubAge;
     parts.push(`Club context: ${clubDay}, age band ${ageLabel}.`);
+  }
+  if (huntDuration && huntDuration !== "any") {
+    const dLabel = huntDuration === "allnight" ? "all night — no time limit, make it memorable" : `${huntDuration} hour${huntDuration !== "1" ? "s" : ""}`;
+    parts.push(`Time available: ${dLabel}.`);
   }
   parts.push("Find three exceptional hidden-gem places in Madrid that fit this brief.");
   return parts.join(" ");
@@ -97,6 +106,18 @@ export default function App() {
   const [swapHistory, setSwapHistory] = useState([]);
   const [vibeIntensity, setVibeIntensity] = useState("hidden");
   const [crewSize, setCrewSize] = useState(2);
+  const [mealType, setMealType] = useState("both");
+  const [cuisine, setCuisine] = useState("any");
+  const [huntDuration, setHuntDuration] = useState("any");
+  const [weather, setWeather] = useState(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [navigatorChat, setNavigatorChat] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [rivalryMode, setRivalryMode] = useState(false);
+  const [rivalry2Category, setRivalry2Category] = useState("clubs");
+  const photoInputRef = useRef(null);
 
   const currentVibe = preferences?.vibe || null;
   const theme = currentVibe ? VIBE_THEMES[currentVibe] : null;
@@ -130,6 +151,17 @@ export default function App() {
       descOverride = surpriseDescs[effectiveCategory];
     }
 
+    // ── Rivalry mode: combine two vibes into one hunt ──
+    if (rivalryMode && descOverride == null && briefInputTab === "crew" && effectiveCategory !== "surprise") {
+      const cat1 = CHEST_OPTIONS.find(c => c.id === effectiveCategory);
+      const cat2 = CHEST_OPTIONS.find(c => c.id === rivalry2Category);
+      if (cat1 && cat2 && cat1.id !== cat2.id) {
+        const bLine = barrio?.name ? ` in ${barrio.name}` : "";
+        descOverride = `Two people with rival tastes: Person 1 wants ${cat1.subtitle}, Person 2 wants ${cat2.subtitle}. Find three hidden gems${bLine} in Madrid that can satisfy both sides — versatile, character-filled spots that bridge different vibes. Group of ${crewSize}.`;
+        effectiveCategory = "restaurants_bars";
+      }
+    }
+
     let rawDesc;
     if (descOverride != null) rawDesc = descOverride;
     else if (briefInputTab === "capitan") rawDesc = captainPrompt;
@@ -142,6 +174,9 @@ export default function App() {
         clubDay,
         clubAge,
         crewSize,
+        mealType,
+        cuisine,
+        huntDuration,
       });
 
     if (briefInputTab === "capitan" && !String(rawDesc).trim()) {
@@ -261,6 +296,15 @@ export default function App() {
     setBriefInputTab("crew");
     setCaptainPrompt("");
     setCaptainExtrasOpen(false);
+    setHuntDuration("any");
+    setWeather(null);
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setSpeaking(false);
+    setNavigatorChat(false);
+    setChatHistory([]);
+    setChatInput("");
+    setChatLoading(false);
+    setRivalryMode(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -353,6 +397,64 @@ export default function App() {
     }
   }, [screen, bounties]);
 
+  useEffect(() => {
+    if (screen !== "reveal" || !bounties.length) return;
+    const { lat, lng } = bounties[0];
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&forecast_days=1`)
+      .then(r => r.json())
+      .then(d => { if (d.current_weather) setWeather(d.current_weather); })
+      .catch(() => {});
+  }, [screen]);
+
+  function speakBounties() {
+    if (!window.speechSynthesis) return;
+    if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
+    const text = `Ahoy, Captain! Your three treasures for tonight are: ${bounties.map((b, i) => `Number ${i + 1}: ${b.pirate_name}. ${b.hook} ${b.send_off || ""}`).join(". ")}. Now go claim your bounty!`;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.88; utter.pitch = 0.8;
+    utter.onend = () => setSpeaking(false);
+    setSpeaking(true);
+    window.speechSynthesis.speak(utter);
+  }
+
+  async function askNavigator() {
+    if (!chatInput.trim() || chatLoading) return;
+    const q = chatInput.trim();
+    setChatHistory(h => [...h, { role: "user", text: q }]);
+    setChatInput(""); setChatLoading(true);
+    try {
+      const res = await fetch(`${API}/api/ask-navigator`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q, bounties, preferences }),
+      });
+      const d = await res.json();
+      setChatHistory(h => [...h, { role: "navigator", text: d.answer || "The navigator has gone silent…" }]);
+    } catch {
+      setChatHistory(h => [...h, { role: "navigator", text: "The seas are rough… try again." }]);
+    } finally { setChatLoading(false); }
+  }
+
+  async function handleVibeFromPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (e.target) e.target.value = "";
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const b64 = ev.target.result.split(",")[1];
+      setError("Reading your photo vibe…");
+      try {
+        const res = await fetch(`${API}/api/vibe-from-photo`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_b64: b64, mime_type: file.type }),
+        });
+        const d = await res.json();
+        if (d.hunt_description) { setError(""); startHunt(d.hunt_description, null); }
+        else setError(d.error || "Could not read photo vibe");
+      } catch (err) { setError(err.message); }
+    };
+    reader.readAsDataURL(file);
+  }
+
   function toggleRole(id) { setRoles(p => p.includes(id) ? p.filter(r => r !== id) : [...p, id]); }
 
   useEffect(() => {
@@ -444,10 +546,13 @@ export default function App() {
                   <BriefHeroStarfield />
                   <BriefHeroFloatingDecor />
                   <div className="chest-hero-scene-main">
+                    <div style={{ display:"flex", justifyContent:"center", marginBottom:"0.25rem" }}>
+                      <PirateFigureSVG size={72} />
+                    </div>
                     <span className="chest-deck-label">Choose your course</span>
-                    <p className="chest-deck-tagline">Three holds, three voyages — tap the chest that matches your crew.</p>
-                    <div className="chest-picker-grid chest-picker-mascot">
-                      {CHEST_OPTIONS.map((chest, i) => (
+                    <p className="chest-deck-tagline">Pick a chest — or let the navigator surprise you.</p>
+                    <div className="chest-picker-grid chest-picker-mascot" style={{ gridTemplateColumns:"repeat(3, minmax(0, 1fr))" }}>
+                      {CHEST_OPTIONS.filter(c => c.id !== "surprise").map((chest, i) => (
                         <button
                           type="button"
                           key={chest.id}
@@ -467,10 +572,48 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                    {/* Surprise Me — standalone button */}
+                    <div style={{ padding:"0 0.5rem 0.5rem", marginTop:"0.85rem" }}>
+                      <button type="button" onClick={() => {
+                        setSelectedCategory("surprise");
+                        const hour = new Date().getHours();
+                        const cat = hour >= 22 || hour < 4 ? "clubs" : hour >= 18 ? "restaurants_bars" : "museums";
+                        const surpriseDesc = {
+                          clubs: "Surprise us with the single most unmissable secret spot in Madrid tonight — something locals love that we would never find on our own.",
+                          restaurants_bars: "Surprise us completely — pick the most magical hidden gem restaurant or bar in Madrid right now, something extraordinary we would never discover alone.",
+                          museums: "Surprise us with the most fascinating hidden cultural gem in Madrid right now — something genuinely amazing off the tourist trail.",
+                        }[cat];
+                        startHunt(surpriseDesc, null);
+                      }} style={{
+                        width:"100%", padding:"0.9rem 1.25rem", borderRadius:14,
+                        background:"linear-gradient(135deg, #041510 0%, #082a1a 60%, #041510 100%)",
+                        border:"1.5px solid rgba(0,212,170,0.4)",
+                        boxShadow:"0 0 24px rgba(0,212,170,0.14), inset 0 1px 0 rgba(0,212,170,0.08)",
+                        cursor:"pointer", transition:"all 0.25s",
+                        display:"flex", alignItems:"center", gap:12,
+                      }}>
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ flexShrink:0 }}>
+                          <path d="M16 4 L16 22" stroke="#00D4AA" strokeWidth="1.5" strokeLinecap="round"/>
+                          <path d="M16 4 L26 14 L16 14 Z" fill="#00D4AA" opacity="0.85"/>
+                          <path d="M16 6 L9 16 L16 16 Z" fill="#00D4AA" opacity="0.55"/>
+                          <path d="M5 22 Q16 19 27 22 L24 28 Q16 26 8 28 Z" fill="#00D4AA" opacity="0.7"/>
+                          <line x1="5" y1="22" x2="27" y2="22" stroke="#00D4AA" strokeWidth="1.2" opacity="0.5"/>
+                        </svg>
+                        <div style={{ textAlign:"left", flex:1 }}>
+                          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"0.95rem", color:"#00D4AA", fontWeight:700, letterSpacing:"0.04em" }}>Surprise Me</div>
+                          <div style={{ fontSize:"0.68rem", color:"rgba(0,212,170,0.6)", fontStyle:"italic", marginTop:2 }}>Gemini picks everything — trust the navigator</div>
+                        </div>
+                        <span style={{ fontSize:"1rem", color:"rgba(0,212,170,0.55)", flexShrink:0 }}>→</span>
+                      </button>
+                    </div>
                   </div>
                   <div className="chest-scene-footer">
                     <p className="chest-scene-quote">&ldquo;Aye, I know every hidden gem&hellip;&rdquo;</p>
-                    <div className="chest-scene-brand">Hidden Gems of Madrid</div>
+                    <div className="chest-scene-brand" style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                      <span style={{ color:"#D4A96A" }}>RUMBO</span>
+                      <span style={{ color:"rgba(212,169,106,0.35)", fontSize:"0.55rem" }}>×</span>
+                      <span style={{ color:"#4285F4", letterSpacing:"0.12em" }}>GOOGLE MAPS</span>
+                    </div>
                     <BriefHeroFooterIcons />
                   </div>
                 </div>
@@ -493,15 +636,62 @@ export default function App() {
                     className={`brief-tab ${briefInputTab === "capitan" ? "sel" : ""}`}
                     onClick={() => setBriefInputTab("capitan")}
                   >
-                    Capitan
+                    Captain
                   </button>
                 </div>
 
                 {briefInputTab === "crew" ? (
                   <>
-                    <p style={{ fontSize: "0.8rem", color: "#6b5c48", marginBottom: "0.85rem", lineHeight: 1.5 }}>
-                      <em>Crew</em> mode builds your orders from the chest, neighborhood, crew roles, and sort — no typing required. Switch to <strong>Capitan</strong> for a free-form brief.
+                    <p style={{ fontSize: "0.78rem", color: "#8a7a5a", marginBottom: "0.85rem", fontStyle:"italic" }}>
+                      Pick your options below — or switch to <strong>Captain</strong> to type freely.
                     </p>
+
+                    {/* Food vs Drinks battle — only for restaurants_bars */}
+                    {selectedCategory === "restaurants_bars" && (
+                      <div style={{ marginBottom:"0.85rem" }}>
+                        <span className="chips-label">Feast or Grog?</span>
+                        <div className="meal-battle">
+                          <button type="button" className={`meal-battle-side ${mealType==="food" ? "sel-food" : ""}`} onClick={() => setMealType(mealType==="food" ? "both" : "food")}>
+                            <span style={{ fontSize:"1.6rem" }}>🍖</span>
+                            <span style={{ fontSize:"0.7rem", fontWeight:700, color:"#b35c00", letterSpacing:"0.06em" }}>FEAST</span>
+                            <span style={{ fontSize:"0.62rem", color:"#8a7a5a" }}>Food only</span>
+                          </button>
+                          <div className="meal-battle-vs">VS</div>
+                          <button type="button" className={`meal-battle-side ${mealType==="drinks" ? "sel-drinks" : ""}`} onClick={() => setMealType(mealType==="drinks" ? "both" : "drinks")}>
+                            <span style={{ fontSize:"1.6rem" }}>🍸</span>
+                            <span style={{ fontSize:"0.7rem", fontWeight:700, color:"#0F2747", letterSpacing:"0.06em" }}>GROG</span>
+                            <span style={{ fontSize:"0.62rem", color:"#8a7a5a" }}>Drinks only</span>
+                          </button>
+                        </div>
+                        <button type="button" className={`meal-battle-both ${mealType==="both" ? "sel" : ""}`} onClick={() => setMealType("both")}>
+                          🤝 Both — food and drinks
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Cuisine selector — only for food/both in restaurants_bars */}
+                    {selectedCategory === "restaurants_bars" && mealType !== "drinks" && (
+                      <div style={{ marginBottom:"0.5rem" }}>
+                        <span className="chips-label">Cuisine</span>
+                        <div className="cuisine-grid">
+                          {[
+                            { id:"any", label:"Any" },
+                            { id:"Spanish tapas", label:"Spanish" },
+                            { id:"Italian", label:"Italian" },
+                            { id:"Japanese", label:"Japanese" },
+                            { id:"Asian fusion", label:"Asian" },
+                            { id:"Mexican", label:"Mexican" },
+                            { id:"Mediterranean", label:"Mediterranean" },
+                            { id:"Indian", label:"Indian" },
+                            { id:"vegan and vegetarian", label:"Vegan" },
+                            { id:"fast food", label:"Fast Food" },
+                          ].map(c => (
+                            <button type="button" key={c.id} className={`chip ${cuisine===c.id ? "sel" : ""}`} onClick={() => setCuisine(c.id)}>{c.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedCategory === "clubs" && (
                       <div className="club-filter-panel" key="club-panel-crew">
                         <span className="chips-label" style={{ marginTop: "0.85rem" }}>Night details (required)</span>
@@ -588,6 +778,41 @@ export default function App() {
                             {n === 1 ? "Solo" : n === 6 ? "6+" : n}
                           </button>
                         ))}
+                      </div>
+                      <span className="chips-label" style={{ marginTop: "0.75rem" }}>How long do you have?</span>
+                      <div className="chips-row">
+                        {[{id:"any",label:"Any"},{id:"1",label:"1 hr"},{id:"2",label:"2 hrs"},{id:"3",label:"3 hrs"},{id:"allnight",label:"All night"}].map(d => (
+                          <button type="button" key={d.id} className={`chip ${huntDuration===d.id ? "sel" : ""}`} onClick={() => setHuntDuration(d.id)}>{d.label}</button>
+                        ))}
+                      </div>
+                      {/* Rivalry Mode toggle */}
+                      <div style={{ marginTop:"0.75rem" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", marginBottom:"0.45rem" }}>
+                          <button type="button" onClick={() => setRivalryMode(r => !r)} style={{
+                            width:36, height:20, borderRadius:10, border:"none", cursor:"pointer", padding:2,
+                            background: rivalryMode ? "#8B2020" : "#d0c8b8", transition:"background 0.25s", flexShrink:0,
+                            display:"flex", alignItems:"center",
+                          }} aria-pressed={rivalryMode} aria-label="Rivalry mode">
+                            <span style={{ width:16, height:16, borderRadius:"50%", background:"white", display:"block",
+                              transform: rivalryMode ? "translateX(16px)" : "translateX(0)", transition:"transform 0.25s",
+                              boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }} />
+                          </button>
+                          <span style={{ fontSize:"0.78rem", color:"#4a3820", fontWeight:500 }}>⚔️ Rivalry Mode</span>
+                          <span style={{ fontSize:"0.72rem", color:"#8a7a5a" }}>— two vibes, one crew</span>
+                        </div>
+                        {rivalryMode && (
+                          <div style={{ padding:"0.65rem 0.75rem", borderRadius:12, border:"1px solid rgba(139,32,32,0.2)", background:"rgba(139,32,32,0.04)", animation:"fadeUp 0.3s ease" }}>
+                            <span className="chips-label">Person 2 picks:</span>
+                            <div className="chips-row">
+                              {CHEST_OPTIONS.filter(c => c.id !== "surprise").map(c => (
+                                <button type="button" key={c.id} className={`chip ${rivalry2Category===c.id ? "sel" : ""}`}
+                                  onClick={() => setRivalry2Category(c.id)}>
+                                  {c.title}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>
@@ -755,7 +980,7 @@ export default function App() {
                 {/* Vibe intensity selector */}
                 <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", margin:"0.75rem 0 0.5rem" }}>
                   <span style={{ fontSize:"0.72rem", color:"#6b5c48", fontWeight:500, flexShrink:0 }}>Exclusivity</span>
-                  {[{id:"local",label:"Local",desc:"<1500 reviews"},{id:"hidden",label:"Hidden",desc:"<800 reviews"},{id:"secret",label:"Secret",desc:"<250 reviews"}].map(v => (
+                  {[{id:"local",label:"Local",desc:"<1500 reviews"},{id:"hidden",label:"Hidden",desc:"<800 reviews"},{id:"popular",label:"Popular",desc:"Well-known spots"}].map(v => (
                     <button key={v.id} type="button" onClick={() => setVibeIntensity(v.id)} title={v.desc} style={{
                       flex:1, padding:"0.35rem 0", border:"1px solid", borderRadius:8, cursor:"pointer", fontSize:"0.7rem", fontWeight:600,
                       transition:"all 0.2s",
@@ -765,6 +990,24 @@ export default function App() {
                     }}>{v.label}</button>
                   ))}
                 </div>
+
+                {/* Photo vibe match — Telescope */}
+                <input ref={photoInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleVibeFromPhoto} />
+                <button type="button" onClick={() => photoInputRef.current?.click()} style={{
+                  width:"100%", marginBottom:"0.75rem", padding:"0.85rem 1rem", borderRadius:14,
+                  border:"2px solid rgba(212,169,106,0.55)",
+                  background:"linear-gradient(135deg, rgba(212,169,106,0.08) 0%, rgba(212,169,106,0.14) 100%)",
+                  boxShadow:"0 0 18px rgba(212,169,106,0.12)",
+                  cursor:"pointer", transition:"all 0.2s",
+                  display:"flex", alignItems:"center", gap:10,
+                }}>
+                  <span style={{ fontSize:"1.6rem", flexShrink:0 }}>🔭</span>
+                  <div style={{ textAlign:"left", flex:1 }}>
+                    <div style={{ fontSize:"0.82rem", fontWeight:700, color:"#8B6914", letterSpacing:"0.03em" }}>Spy a Vibe Through the Telescope</div>
+                    <div style={{ fontSize:"0.68rem", color:"rgba(139,105,20,0.65)", fontStyle:"italic", marginTop:2 }}>Upload a photo — the navigator reads its soul</div>
+                  </div>
+                  <span style={{ fontSize:"0.85rem", color:"rgba(139,105,20,0.5)", flexShrink:0 }}>→</span>
+                </button>
 
                 <button type="button" className="sail-btn-premium" onClick={() => startHunt()} disabled={!canSail}>
                   {getSailLabel()} <span style={{color:"#D4A96A",marginLeft:4}}>→</span>
@@ -793,24 +1036,11 @@ export default function App() {
                 }}>
                   ⚓ Take Me There Now — Use My Location
                 </button>
-                <p className="sail-tagline">3 hidden gems · Pirate-voiced picks · Google Maps links</p>
+                <p className="sail-tagline">Powered by Google Maps × Gemini AI · 3 real hidden gems</p>
                 {error && <div className="err-box">⚠️ {error}</div>}
                 </div>
               </div>
 
-              <div className="features-bar features-bar-brief fu fu4">
-                {[
-                  ["◆", "3 hidden gems"],
-                  ["◆", "Pirate-voiced picks"],
-                  ["◆", "Google Maps ready"],
-                  ["◆", "AI navigator"],
-                ].map(([i, t]) => (
-                  <div key={t} className="feat">
-                    <span className="feat-glyph">{i}</span>
-                    <span>{t}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </section>
 
@@ -836,11 +1066,41 @@ export default function App() {
 
           <hr className="divider"/>
 
+          {/* Fan Favourites */}
+          <section className="fan-fav-section">
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:"0" }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(255,80,60,0.08)", border:"1px solid rgba(255,80,60,0.2)", borderRadius:40, padding:"0.3rem 1rem", marginBottom:"0.85rem", fontSize:"0.7rem", letterSpacing:"0.12em", color:"#c0392b", fontWeight:700, textTransform:"uppercase" }}>🔥 Trending in Madrid</div>
+              <h2 className="sec-headline" style={{ marginBottom:"0.4rem" }}>Fan Favourites</h2>
+              <p className="sec-sub">Places that keep blowing up on TikTok and Instagram.</p>
+            </div>
+            <div className="fan-fav-grid">
+              {FAN_FAVOURITES.map(f => (
+                <div key={f.name} className="fan-fav-card">
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                    <span className="fan-fav-heat">{f.heat}</span>
+                    <span className="fan-fav-platform">{f.platform}</span>
+                  </div>
+                  <div className="fan-fav-name">{f.name}</div>
+                  <div className="fan-fav-barrio">📍 {f.barrio}</div>
+                  <div className="fan-fav-desc">{f.desc}</div>
+                  <div className="fan-fav-tags">
+                    {f.tags.map(t => <span key={t}>{t}</span>)}
+                  </div>
+                  <button className="fan-fav-cta" onClick={() => startHunt(f.huntDesc, BARRIOS.find(b => b.name === f.barrio) || null)}>
+                    Hunt nearby gems →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <hr className="divider"/>
+
           <section className="routes-section" id="routes">
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:"2.5rem" }}>
               <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(212,169,106,0.1)", border:"1px solid rgba(212,169,106,0.25)", borderRadius:40, padding:"0.3rem 1rem", marginBottom:"0.85rem", fontSize:"0.7rem", letterSpacing:"0.12em", color:"#8B6914", fontWeight:600, textTransform:"uppercase" }}>✦ Quick Sail ✦</div>
               <h2 className="sec-headline" style={{ marginBottom:"0.5rem" }}>Legendary Voyages of Madrid</h2>
-              <p className="sec-sub">Six curated routes — click to sail instantly.</p>
+              <p className="sec-sub">Nine curated routes — click to sail instantly.</p>
             </div>
             <div className="routes-grid">
               {ROUTES_DATA.map((r) => (
@@ -1021,6 +1281,27 @@ export default function App() {
                   {theme.tagline}
                 </p>
               )}
+              {/* Weather badge */}
+              {weather && (() => {
+                const c = weather.weathercode ?? weather.weather_code ?? 0;
+                const temp = weather.temperature ?? weather.temperature_2m ?? 0;
+                const icon = c === 0 ? "☀️" : c <= 3 ? "⛅" : c <= 48 ? "🌫️" : c <= 67 ? "🌧️" : c <= 77 ? "❄️" : c <= 82 ? "🌦️" : "⛈️";
+                const desc = c === 0 ? "Clear skies" : c <= 3 ? "Partly cloudy" : c <= 48 ? "Foggy" : c <= 67 ? "Rainy" : c <= 77 ? "Snowing" : c <= 82 ? "Showers" : "Stormy";
+                return (
+                  <div style={{
+                    display:"inline-flex", alignItems:"center", gap:7,
+                    background:"rgba(255,255,255,0.12)", backdropFilter:"blur(8px)",
+                    border:`1px solid ${theme?.cardBorder || "rgba(255,255,255,0.2)"}`,
+                    borderRadius:30, padding:"0.3rem 0.9rem", marginTop:"0.6rem",
+                    fontSize:"0.8rem", color: theme?.textPrimary || "white",
+                  }}>
+                    <span>{icon}</span>
+                    <span style={{ fontWeight:500 }}>Madrid · {desc}</span>
+                    <span style={{ opacity:0.55 }}>·</span>
+                    <span style={{ color: theme?.goldColor || "#D4A96A", fontWeight:600 }}>{Math.round(temp)}°C</span>
+                  </div>
+                );
+              })()}
               {/* Cost estimate — woven into the info row below tagline */}
               {preferences && bounties.length > 0 && (() => {
                 const avgLevel = Math.round(bounties.reduce((s, b) => s + (b.price_level || 2), 0) / bounties.length);
@@ -1071,13 +1352,6 @@ export default function App() {
               <RouteOptimizer bounties={bounties} theme={theme}/>
             </div>
 
-            {/* Crew reactions */}
-            {reactions && (
-              <div style={{ color: theme?.textPrimary || "white" }}>
-                <CrewReactions reactions={reactions} theme={theme}/>
-              </div>
-            )}
-
             {/* Scroll cards */}
             <div style={{ display:"flex", flexDirection:"column", gap:"1.25rem", marginBottom:"2rem" }}>
               {bounties.map((b,i)=>(
@@ -1112,6 +1386,13 @@ export default function App() {
                 background:"rgba(255,255,255,0.1)", color: theme?.textPrimary||"white",
                 border:`1px solid ${theme?.cardBorder||"rgba(255,255,255,0.15)"}`,
               }}>⚓ New Search</button>
+              {typeof window !== "undefined" && window.speechSynthesis && (
+                <button className="bot-btn" onClick={speakBounties} style={{
+                  background: speaking ? "rgba(255,80,60,0.15)" : "rgba(255,255,255,0.1)",
+                  color: speaking ? "#ff9999" : (theme?.textPrimary||"white"),
+                  border:`1px solid ${speaking ? "rgba(255,80,60,0.3)" : (theme?.cardBorder||"rgba(255,255,255,0.15)")}`,
+                }}>{speaking ? "🔇 Stop" : "🔊 Navigator Speaks"}</button>
+              )}
               <button className="bot-btn" onClick={shareText} style={{
                 background: theme?.numberBadgeBg || "#0F2747", color:"white",
                 opacity: copied ? 0.8 : 1,
@@ -1128,6 +1409,59 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {/* Floating Ask the Navigator button */}
+          <div style={{ position:"fixed", bottom:"1.5rem", right:"1.5rem", zIndex:200 }}>
+            <button onClick={() => { setNavigatorChat(true); if (!chatHistory.length) setChatHistory([]); }} style={{
+              background: theme?.numberBadgeBg || "#0F2747", color:"white",
+              border:"none", borderRadius:"50px", padding:"0.7rem 1.2rem",
+              boxShadow:"0 8px 28px rgba(0,0,0,0.4)", cursor:"pointer",
+              fontSize:"0.85rem", fontWeight:600, display:"flex", alignItems:"center", gap:6,
+              transition:"all 0.2s",
+            }}>🗺️ Ask the Navigator</button>
+          </div>
+
+          {/* Navigator Chat Modal */}
+          {navigatorChat && (
+            <div style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"flex-end", justifyContent:"flex-end", padding:"80px 1.5rem 1.5rem" }}
+              onClick={() => setNavigatorChat(false)}>
+              <div style={{ background:"#0F2747", borderRadius:"20px", padding:"1.4rem", width:"100%", maxWidth:"380px", border:"1px solid rgba(212,169,106,0.25)", boxShadow:"0 20px 60px rgba(0,0,0,0.55)", maxHeight:"62vh", display:"flex", flexDirection:"column" }}
+                onClick={e => e.stopPropagation()}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.85rem" }}>
+                  <span style={{ fontFamily:"'Playfair Display',serif", fontSize:"1rem", color:"#F7F4EE" }}>🗺️ The Navigator</span>
+                  <button onClick={() => setNavigatorChat(false)} style={{ background:"transparent", border:"none", color:"rgba(255,255,255,0.4)", cursor:"pointer", fontSize:"1.3rem", lineHeight:1 }}>×</button>
+                </div>
+                <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:"0.6rem", marginBottom:"0.75rem", minHeight:"80px" }}>
+                  {chatHistory.length === 0 && (
+                    <div style={{ fontSize:"0.82rem", color:"rgba(212,169,106,0.65)", fontStyle:"italic", textAlign:"center", padding:"1rem 0.5rem", lineHeight:1.5 }}>
+                      Ask me anything about tonight's spots, Captain…
+                    </div>
+                  )}
+                  {chatHistory.map((m, i) => (
+                    <div key={i} style={{
+                      padding:"0.55rem 0.8rem", borderRadius:12, fontSize:"0.82rem", lineHeight:1.5,
+                      background: m.role === "user" ? "rgba(255,255,255,0.08)" : "rgba(212,169,106,0.12)",
+                      color: m.role === "user" ? "rgba(255,255,255,0.85)" : "#D4A96A",
+                      border:`1px solid ${m.role === "user" ? "rgba(255,255,255,0.1)" : "rgba(212,169,106,0.25)"}`,
+                      alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+                      maxWidth:"92%",
+                    }}>{m.text}</div>
+                  ))}
+                  {chatLoading && <div style={{ fontSize:"0.75rem", color:"rgba(212,169,106,0.5)", fontStyle:"italic" }}>Navigator is thinking…</div>}
+                </div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <input
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) askNavigator(); }}
+                    placeholder="Ask about tonight's picks…"
+                    style={{ flex:1, background:"rgba(255,255,255,0.08)", border:"1px solid rgba(212,169,106,0.3)", borderRadius:10, padding:"0.5rem 0.8rem", color:"white", fontSize:"0.82rem", outline:"none" }}
+                  />
+                  <button onClick={askNavigator} disabled={chatLoading} style={{ background:"#D4A96A", color:"#0F2747", border:"none", borderRadius:10, padding:"0.5rem 0.85rem", cursor:"pointer", fontWeight:700, fontSize:"0.85rem" }}>⚓</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Share card modal */}
           {showShare && (

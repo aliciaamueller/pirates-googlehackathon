@@ -7,6 +7,7 @@ import json
 import time
 import hashlib
 import math
+import random
 from datetime import datetime
 from agent import get_agent_response, CREW
 
@@ -61,7 +62,7 @@ def get_place_details(place_id):
     if ck in _cache:
         return _cache[ck]
     url = "https://maps.googleapis.com/maps/api/place/details/json"
-    params = {"place_id": place_id, "fields": "opening_hours", "key": MAPS_KEY}
+    params = {"place_id": place_id, "fields": "opening_hours,website", "key": MAPS_KEY}
     try:
         resp = requests.get(url, params=params, timeout=5)
         data = resp.json()
@@ -80,12 +81,13 @@ def get_place_details(place_id):
                         if len(close_time) == 4:
                             closes_at = f"{close_time[:2]}:{close_time[2:]}"
                         break
-            result = {"open_now": open_now, "closes_at": closes_at}
+            website = data.get("result", {}).get("website")
+            result = {"open_now": open_now, "closes_at": closes_at, "website": website}
             _cache[ck] = result
             return result
     except Exception as e:
         print(f"[Places Details] {e}")
-    return {"open_now": None, "closes_at": None}
+    return {"open_now": None, "closes_at": None, "website": None}
 
 def get_fallback_gems(category="restaurants_bars", lat=40.4168, lng=-3.7038):
     gems = list(FALLBACK_GEMS.get(category, FALLBACK_GEMS["restaurants_bars"]))
@@ -288,6 +290,9 @@ def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="
          "vicinity": p.get("vicinity"), "price_level": p.get("price_level"), "place_id": p.get("place_id")}
         for p in places if p.get("place_id") not in exclude_ids
     ]
+    # Shuffle so Gemini sees a different ordering each call → avoids same picks every time
+    random.shuffle(places_summary)
+    places_summary = places_summary[:12]
 
     special = preferences.get("special_context", "")
     special_line = f"\nSpecial occasion context: {special}" if special else ""
@@ -295,7 +300,7 @@ def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="
     if category == "clubs":
         age_line = f" Target age group: {age_group}." if age_group else ""
         day_line = f"\nToday is {normalize_day(day_of_week)}.{age_line} Prioritize clubs that fit that day's nightlife energy."
-    intensity_limits = {"local": 1500, "hidden": 800, "secret": 250}
+    intensity_limits = {"local": 1500, "hidden": 800, "secret": 250, "popular": 9999}
     review_limit = 9999 if relaxed else (150 if quiet_mode else intensity_limits.get(vibe_intensity, 800))
     review_rule = f"- You MUST return exactly {count} results. If strict review limits prevent this, include the best available options regardless of review count." if relaxed else f"- Prefer places with under {review_limit} reviews; if you cannot find {count} qualifying results, include the best remaining options"
     quiet_line = "\n- PRIORITY: prefer venues with under 150 reviews — intimate, local, quiet spots only" if quiet_mode else ""
@@ -317,12 +322,8 @@ Return ONLY a JSON array, no extra text, no markdown:
 Places to choose from:
 {json.dumps(places_summary, indent=2)}"""
 
-    ck = cache_key("dossier", preferences["vibe"], preferences["budget"], category, sort_mode, normalize_day(day_of_week), [p["place_id"] for p in places_summary], tuple(exclude_ids), quiet_mode, vibe_intensity, relaxed)
-    if ck in _cache:
-        return _cache[ck]
-    raw = call_gemini_with_retry(prompt, temperature=0.8)
+    raw = call_gemini_with_retry(prompt, temperature=0.9)
     result = json.loads(clean_json(raw))
-    _cache[ck] = result
     return result
 
 def build_bounties(dossiers, places, base_url="http://localhost:5001"):
@@ -347,8 +348,10 @@ def build_bounties(dossiers, places, base_url="http://localhost:5001"):
                 "maps_url": f"https://www.google.com/maps/place/?q=place_id:{d.get('place_id')}",
                 "photo_url": photo_url,
                 "price_level": match.get("price_level"),
+                "user_ratings_total": match.get("user_ratings_total"),
                 "open_now": details.get("open_now"),
                 "closes_at": details.get("closes_at"),
+                "website": details.get("website"),
             })
     return bounties
 
@@ -522,6 +525,63 @@ def crew_react():
             pass
 
     return jsonify({"reactions": reactions})
+
+@app.route("/api/vibe-from-photo", methods=["POST"])
+def vibe_from_photo():
+    data = request.json or {}
+    image_b64 = data.get("image_b64", "")
+    mime_type = data.get("mime_type", "image/jpeg")
+    if not image_b64:
+        return jsonify({"error": "No image provided"}), 400
+    api_key = os.getenv("GEMINI_API_KEY")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    prompt_text = (
+        "You are RUMBO, a pirate navigator for Madrid nightlife. Look at this photo the user uploaded. "
+        "Based on its vibe, mood, aesthetic, and content, describe the kind of night out in Madrid this person is looking for. "
+        "Write a hunt description (2–3 sentences) that captures the energy of this photo and directs a search for matching hidden gems in Madrid. "
+        "Be specific about vibe — romantic, wild, cultural, foodie, adventure, or chill. "
+        "Keep it under 60 words. Write in second person starting with 'You're looking for...'"
+    )
+    payload = {
+        "contents": [{"parts": [
+            {"text": prompt_text},
+            {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+        ]}]
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=30)
+        if resp.status_code != 200:
+            return jsonify({"error": f"Gemini error {resp.status_code}"}), 500
+        result = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return jsonify({"hunt_description": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/ask-navigator", methods=["POST"])
+def ask_navigator():
+    data = request.json or {}
+    question = (data.get("question") or "").strip()
+    bounties = data.get("bounties", [])
+    preferences = data.get("preferences", {})
+    if not question:
+        return jsonify({"error": "No question provided"}), 400
+    bounties_text = "\n".join([
+        f"- {b.get('pirate_name','?')} ({b.get('name','?')}) at {b.get('address','?')}: {b.get('hook','')}"
+        for b in bounties
+    ])
+    prompt = (
+        f"You are RUMBO, a grizzled pirate navigator who knows every hidden gem in Madrid.\n"
+        f"Tonight's three treasures for the crew:\n{bounties_text}\n\n"
+        f"Vibe: {preferences.get('vibe','unknown')}, budget: {preferences.get('budget','medium')}.\n"
+        f"The crew asks: \"{question}\"\n\n"
+        f"Answer in character as a pirate navigator — dramatic but practical. Max 3 sentences. "
+        f"Give useful advice about the venues, timing, dress code, or Madrid nightlife as relevant."
+    )
+    try:
+        answer = call_gemini_with_retry(prompt, temperature=0.7)
+        return jsonify({"answer": answer})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/health", methods=["GET"])
 def health():

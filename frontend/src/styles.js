@@ -74,6 +74,7 @@ export const BASE_CSS = `
     align-items: start;
     gap: 0;
     padding-top: 104px;
+    padding-bottom: 4rem;
   }
   .brief-hero-column { width: 100%; position: relative; z-index: 1; }
 
@@ -430,6 +431,70 @@ export const BASE_CSS = `
   .footer { background:#0F2747; color:rgba(255,255,255,0.5); text-align:center; padding:2rem; font-size:0.8rem; position:relative; z-index:1; }
   .footer strong { color:#D4A96A; }
   .divider { border:none; border-top:1px solid #E0D4B8; margin:0; }
+
+  /* FAN FAVOURITES */
+  .fan-fav-section { padding:4.5rem 3rem; max-width:1200px; margin:0 auto; position:relative; z-index:1; }
+  .fan-fav-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; margin-top:2.5rem; }
+  .fan-fav-card {
+    background:white; border:1px solid #E0D4B8; border-radius:18px;
+    padding:1.5rem; display:flex; flex-direction:column; gap:0.5rem;
+    transition:transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s;
+  }
+  .fan-fav-card:hover { transform:translateY(-5px); box-shadow:0 18px 45px rgba(15,39,71,0.12); border-color:#C8A84B; }
+  .fan-fav-heat {
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:0.62rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+    color:#8B6914; background:linear-gradient(135deg,rgba(212,169,106,0.18),rgba(212,169,106,0.08));
+    border:1px solid rgba(212,169,106,0.45); border-radius:30px;
+    padding:0.22rem 0.7rem; margin-bottom:0.1rem;
+  }
+  .fan-fav-heat::before { content:"✦"; font-size:0.55rem; opacity:0.8; }
+  .fan-fav-platform { font-size:0.62rem; letter-spacing:0.1em; text-transform:uppercase; color:#8a7a5a; font-weight:600; }
+  .fan-fav-name { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:700; color:#0F2747; }
+  .fan-fav-barrio { font-size:0.72rem; color:#C8A84B; font-weight:600; letter-spacing:0.05em; }
+  .fan-fav-desc { font-size:0.82rem; color:#6b5c48; line-height:1.55; flex:1; }
+  .fan-fav-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:0.25rem; }
+  .fan-fav-tags span { font-size:0.65rem; color:#8B6914; background:rgba(212,169,106,0.1); border-radius:20px; padding:0.15rem 0.55rem; }
+  .fan-fav-cta {
+    margin-top:0.75rem; padding:0.65rem; border-radius:10px; border:none;
+    background:#0F2747; color:white; font-size:0.8rem; font-weight:600;
+    cursor:pointer; transition:all 0.2s; text-align:center; letter-spacing:0.04em;
+  }
+  .fan-fav-cta:hover { background:#1a3a6a; transform:translateY(-1px); }
+
+  /* MEAL TYPE BATTLE */
+  .meal-battle { display:flex; gap:0.5rem; align-items:stretch; margin-bottom:0.85rem; }
+  .meal-battle-side {
+    flex:1; border:2px solid #E0D4B8; border-radius:12px; padding:0.85rem 0.5rem;
+    cursor:pointer; transition:all 0.2s; background:white;
+    display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
+  }
+  .meal-battle-side:hover { border-color:#C8A84B; }
+  .meal-battle-side.sel-food { border-color:#b35c00; background:rgba(255,154,60,0.08); }
+  .meal-battle-side.sel-drinks { border-color:#0F2747; background:rgba(15,39,71,0.06); }
+  .meal-battle-vs {
+    display:flex; align-items:center; justify-content:center;
+    width:32px; flex-shrink:0; font-size:0.7rem; font-weight:700;
+    color:#C8A84B; letter-spacing:0.08em;
+  }
+  .meal-battle-both {
+    width:100%; margin-top:0.35rem; padding:0.45rem; border-radius:8px;
+    border:1px solid #E0D4B8; background:transparent; cursor:pointer;
+    font-size:0.72rem; font-weight:600; color:#6b5c48; transition:all 0.2s; text-align:center;
+  }
+  .meal-battle-both.sel { background:#0F2747; border-color:#0F2747; color:white; }
+  .meal-battle-both:hover:not(.sel) { border-color:#C8A84B; }
+
+  /* CUISINE CHIPS */
+  .cuisine-grid { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:0.35rem; margin-bottom:0.75rem; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:rgba(212,169,106,0.3) transparent; }
+  .cuisine-grid .chip { font-size:0.72rem; padding:0.22rem 0.6rem; flex-shrink:0; }
+
+  @media (max-width:900px) {
+    .fan-fav-grid { grid-template-columns:1fr; }
+  }
+  @media (max-width:600px) {
+    .fan-fav-section { padding:3rem 1.5rem; }
+  }
 
   /* ANIMATIONS */
   @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
