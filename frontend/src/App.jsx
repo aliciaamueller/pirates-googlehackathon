@@ -108,6 +108,18 @@ function RoutePolyline({ bounties, onRouteInfo }) {
       offset: '0', repeat: '16px',
     }];
 
+    // Marching dots: animate offset from 0→100% in a loop
+    let marchOffset = 0;
+    const march = setInterval(() => {
+      if (!polylineRef.current) return;
+      marchOffset = (marchOffset + 2) % 200;
+      const icons = polylineRef.current.get("icons");
+      if (icons) {
+        icons[0].offset = (marchOffset / 2) + "%";
+        polylineRef.current.set("icons", icons);
+      }
+    }, 80);
+
     const fallback = () => {
       polylineRef.current = new window.google.maps.Polyline({
         path: bounties.map(b => ({ lat: b.lat, lng: b.lng })),
@@ -115,7 +127,10 @@ function RoutePolyline({ bounties, onRouteInfo }) {
       });
     };
 
-    if (!window.google.maps.DirectionsService) { fallback(); return () => polylineRef.current?.setMap(null); }
+    if (!window.google.maps.DirectionsService) {
+      fallback();
+      return () => { clearInterval(march); polylineRef.current?.setMap(null); };
+    }
 
     const ds = new window.google.maps.DirectionsService();
     const waypoints = bounties.slice(1, -1).map(b => ({ location: { lat: b.lat, lng: b.lng }, stopover: true }));
@@ -135,7 +150,7 @@ function RoutePolyline({ bounties, onRouteInfo }) {
       if (onRouteInfoRef.current) onRouteInfoRef.current({ km: (totalMeters / 1000).toFixed(1), mins: Math.round(totalSeconds / 60) });
     });
 
-    return () => { if (polylineRef.current) polylineRef.current.setMap(null); };
+    return () => { clearInterval(march); if (polylineRef.current) polylineRef.current.setMap(null); };
   }, [map, bounties]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
@@ -473,7 +488,7 @@ const MADRID_CENTER = { lat: 40.4168, lng: -3.7038 };
 const VIBE_THEMES = {
   wild: {
     label: "Wild Night",
-    icon: "🔥",
+    icon: "💀",
     skyGradient: "linear-gradient(180deg, #0a0418 0%, #1a0630 35%, #2d0a4e 60%, #1a0a20 100%)",
     accentColor: "#e040fb",
     accentGlow: "rgba(224,64,251,0.25)",
@@ -505,7 +520,7 @@ const VIBE_THEMES = {
   },
   cultural: {
     label: "Cultural Discovery",
-    icon: "🎭",
+    icon: "📜",
     skyGradient: "linear-gradient(180deg, #0f1b2d 0%, #162540 30%, #1e3050 55%, #162030 100%)",
     accentColor: "#80cbc4",
     accentGlow: "rgba(128,203,196,0.2)",
@@ -521,7 +536,7 @@ const VIBE_THEMES = {
   },
   foodie: {
     label: "Foodie Hunt",
-    icon: "🍽️",
+    icon: "🍖",
     skyGradient: "linear-gradient(180deg, #120800 0%, #231200 30%, #180e00 60%, #0c0800 100%)",
     accentColor: "#ff9a3c",
     accentGlow: "rgba(255,154,60,0.22)",
@@ -537,7 +552,7 @@ const VIBE_THEMES = {
   },
   adventure: {
     label: "Adventure Mode",
-    icon: "⚡",
+    icon: "⚔️",
     skyGradient: "linear-gradient(180deg, #0a1520 0%, #102030 30%, #1a3040 55%, #102028 100%)",
     accentColor: "#ffd54f",
     accentGlow: "rgba(255,213,79,0.2)",
@@ -553,7 +568,7 @@ const VIBE_THEMES = {
   },
   chill: {
     label: "Chill Vibes",
-    icon: "☕",
+    icon: "🌙",
     skyGradient: "linear-gradient(180deg, #100a04 0%, #221408 35%, #181008 60%, #0e0c08 100%)",
     accentColor: "#D4A96A",
     accentGlow: "rgba(212,169,106,0.22)",
@@ -1200,92 +1215,143 @@ const ShareCard = ({ bounties, preferences, theme, onClose }) => {
     const c = canvasRef.current;
     if (!c) return;
     const ctx = c.getContext("2d");
-    const W = 600, H = 420; c.width = W; c.height = H;
+    // Instagram Story format: 1080×1920 rendered at half res for performance
+    const W = 540, H = 960; c.width = W; c.height = H;
 
-    // Background
+    // Sky gradient background
     const bg = ctx.createLinearGradient(0, 0, 0, H);
+    const accent = theme?.accentColor || "#D4A96A";
     if (theme?.isDay) {
-      bg.addColorStop(0, "#87CEEB"); bg.addColorStop(0.5, "#ffd89b"); bg.addColorStop(1, "#f4a460");
+      bg.addColorStop(0, "#eef4f8"); bg.addColorStop(0.5, "#c8dfe8"); bg.addColorStop(1, "#7fa3b8");
     } else {
-      bg.addColorStop(0, "#0a0418"); bg.addColorStop(0.5, "#1a0630"); bg.addColorStop(1, "#0a0520");
+      const sky = (theme?.skyGradient || "").match(/#[0-9a-f]{6}/gi) || ["#070d1a","#0d1f3c","#0a1628"];
+      bg.addColorStop(0, sky[0]); bg.addColorStop(0.5, sky[1] || sky[0]); bg.addColorStop(1, sky[2] || sky[0]);
     }
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
     // Stars (night only)
     if (!theme?.isDay) {
-      ctx.fillStyle = "white";
-      for (let i = 0; i < 80; i++) {
+      for (let i = 0; i < 120; i++) {
         const x = (Math.sin(i * 137.5) * 0.5 + 0.5) * W;
-        const y = (Math.cos(i * 97.3) * 0.5 + 0.5) * H * 0.6;
-        const r = 0.5 + (i % 3) * 0.4;
-        ctx.globalAlpha = 0.3 + (i % 5) * 0.1;
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        const y = (Math.cos(i * 97.3) * 0.5 + 0.5) * H * 0.45;
+        const r = 0.4 + (i % 4) * 0.35;
+        ctx.globalAlpha = 0.15 + (i % 5) * 0.1;
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       }
       ctx.globalAlpha = 1;
     }
 
-    // Card bg
-    ctx.fillStyle = theme?.isDay ? "rgba(255,252,245,0.92)" : "rgba(15,8,30,0.88)";
-    roundRect(ctx, 30, 30, W - 60, H - 60, 18);
-    ctx.fill();
+    // Inner card panel
+    const pad = 28, cardY = 140, cardH = H - cardY - 100;
+    ctx.fillStyle = theme?.isDay ? "rgba(255,252,245,0.93)" : "rgba(8,14,30,0.88)";
+    roundRect(ctx, pad, cardY, W - pad * 2, cardH, 22); ctx.fill();
 
-    // Gold border
-    ctx.strokeStyle = "#D4A96A"; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.5;
-    roundRect(ctx, 30, 30, W - 60, H - 60, 18); ctx.stroke();
+    // Gold border on card
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.45;
+    roundRect(ctx, pad, cardY, W - pad * 2, cardH, 22); ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // Header
-    ctx.fillStyle = theme?.isDay ? "#0F2747" : "#F0DFA0";
-    ctx.font = "bold 28px Georgia, serif"; ctx.textAlign = "center";
-    ctx.fillText("RUMBO 🧭", W / 2, 90);
+    // Top decorative compass line
+    ctx.strokeStyle = accent; ctx.lineWidth = 1; ctx.globalAlpha = 0.3;
+    ctx.beginPath(); ctx.moveTo(pad + 30, cardY + 60); ctx.lineTo(W - pad - 30, cardY + 60); ctx.stroke();
+    ctx.globalAlpha = 1;
 
-    ctx.fillStyle = theme?.accentColor || "#D4A96A";
-    ctx.font = "italic 14px Georgia, serif";
-    ctx.fillText(theme?.tagline || "Hidden gems found.", W / 2, 115);
+    // RUMBO title
+    ctx.fillStyle = theme?.isDay ? "#0F2747" : "#F0DFA0";
+    ctx.font = "bold 42px Georgia, serif"; ctx.textAlign = "center";
+    ctx.fillText("RUMBO", W / 2, 90);
+    ctx.font = "16px Georgia, serif"; ctx.fillStyle = accent;
+    ctx.fillText("AI Pirate Navigator · Madrid", W / 2, 118);
+
+    // Vibe badge
+    if (preferences?.vibe) {
+      ctx.fillStyle = accent; ctx.globalAlpha = 0.15;
+      roundRect(ctx, W/2 - 80, cardY + 18, 160, 28, 14); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = accent; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(`✦ ${preferences.vibe.toUpperCase()} VIBES ✦`, W / 2, cardY + 37);
+    }
+
+    // Separator
+    ctx.strokeStyle = accent; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.2;
+    ctx.beginPath(); ctx.moveTo(pad + 20, cardY + 56); ctx.lineTo(W - pad - 20, cardY + 56); ctx.stroke();
+    ctx.globalAlpha = 1;
 
     // Bounties
     bounties.forEach((b, i) => {
-      const y = 160 + i * 80;
-      ctx.fillStyle = "#8B2020"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
-      ctx.fillText(`✕ #${i + 1}`, 65, y);
+      const rowH = 200;
+      const y = cardY + 76 + i * rowH;
+
+      // Number badge
+      ctx.fillStyle = theme?.numberBadgeBg || "#8B2020";
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.arc(pad + 36, y + 18, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "white"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(i + 1, pad + 36, y + 23);
+
+      // Pirate name
       ctx.fillStyle = theme?.isDay ? "#0F2747" : "#F0DFA0";
-      ctx.font = "bold 16px Georgia, serif";
-      ctx.fillText(b.pirate_name || b.name, 95, y);
-      ctx.fillStyle = theme?.isDay ? "#8a7a5a" : "rgba(240,223,160,0.6)";
+      ctx.font = "bold 20px Georgia, serif"; ctx.textAlign = "left";
+      const pname = (b.pirate_name || b.name || "").slice(0, 28);
+      ctx.fillText(pname, pad + 62, y + 24);
+
+      // Real name + rating
+      ctx.fillStyle = theme?.isDay ? "#6b5c48" : "rgba(240,223,160,0.55)";
       ctx.font = "13px sans-serif";
-      ctx.fillText(b.address || "", 95, y + 18);
-      ctx.fillStyle = theme?.accentColor || "#D4A96A";
-      ctx.font = "italic 12px Georgia, serif";
-      ctx.fillText(`"${(b.hook || "").slice(0, 55)}${b.hook?.length > 55 ? "…" : ""}"`, 95, y + 34);
+      const rname = (b.name || "").slice(0, 30);
+      const stars = b.rating ? " · " + "★".repeat(Math.floor(b.rating)) + " " + b.rating : "";
+      ctx.fillText(rname + stars, pad + 62, y + 46);
+
+      // Hook quote
+      ctx.fillStyle = accent; ctx.font = "italic 14px Georgia, serif";
+      const hook = `"${(b.hook || "").slice(0, 60)}${(b.hook || "").length > 60 ? "…" : ""}"`;
+      ctx.fillText(hook, pad + 18, y + 76);
+
+      // Address
+      ctx.fillStyle = theme?.isDay ? "#8a7a5a" : "rgba(240,223,160,0.4)";
+      ctx.font = "12px sans-serif";
+      ctx.fillText("📍 " + (b.address || "").slice(0, 42), pad + 18, y + 100);
+
+      // Divider (except last)
+      if (i < bounties.length - 1) {
+        ctx.strokeStyle = accent; ctx.lineWidth = 0.6; ctx.globalAlpha = 0.15;
+        ctx.beginPath(); ctx.moveTo(pad + 18, y + 120); ctx.lineTo(W - pad - 18, y + 120); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
     });
 
     // Footer
-    ctx.fillStyle = "#D4A96A"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("rumbo.app · AI Pirate Navigator", W / 2, H - 45);
+    ctx.fillStyle = accent; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center"; ctx.globalAlpha = 0.8;
+    ctx.fillText("rumbo.app · Find your treasure", W / 2, H - 52);
+    ctx.globalAlpha = 0.4; ctx.font = "11px sans-serif";
+    ctx.fillText("AI-powered hidden gems in Madrid", W / 2, H - 34);
+    ctx.globalAlpha = 1;
+
     setDone(true);
   }, []);
 
   const download = () => {
     const a = document.createElement("a");
-    a.download = "rumbo-treasure.png";
+    a.download = "rumbo-story.png";
     a.href = canvasRef.current.toDataURL("image/png");
     a.click();
   };
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)",
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 200, padding: "1rem",
     }} onClick={onClose}>
-      <div style={{ maxWidth: 640, width: "100%" }} onClick={e => e.stopPropagation()}>
-        <canvas ref={canvasRef} style={{ width: "100%", borderRadius: 12, display: "block" }} />
+      <div style={{ maxWidth: 340, width: "100%" }} onClick={e => e.stopPropagation()}>
+        <canvas ref={canvasRef} style={{ width: "100%", borderRadius: 16, display: "block", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }} />
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", justifyContent: "center" }}>
           <button onClick={download} style={{
             background: "#D4A96A", color: "#0F2747", border: "none",
             borderRadius: 40, padding: "0.7rem 1.8rem", cursor: "pointer",
             fontWeight: 600, fontSize: "0.85rem",
-          }}>⬇ Download Card</button>
+          }}>⬇ Save for Story</button>
           <button onClick={onClose} style={{
             background: "rgba(255,255,255,0.1)", color: "white", border: "1px solid rgba(255,255,255,0.2)",
             borderRadius: 40, padding: "0.7rem 1.4rem", cursor: "pointer", fontSize: "0.85rem",
@@ -1324,9 +1390,20 @@ function ConfirmSwapButton({ onConfirm, swapping, theme }) {
   );
 }
 
-function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPlan, onFavorite, isFavorited }) {
+const VIBE_CARD_ANIM = {
+  wild:      { hidden: "translateX(40px) rotate(2deg)", duration: "0.5s", easing: "cubic-bezier(0.34,1.56,0.64,1)" },
+  romantic:  { hidden: "translateY(20px) scale(0.97)",  duration: "0.7s", easing: "ease" },
+  cultural:  { hidden: "translateX(-40px)",             duration: "0.5s", easing: "ease-out" },
+  foodie:    { hidden: "translateY(28px) scale(0.95)",  duration: "0.55s", easing: "cubic-bezier(0.34,1.56,0.64,1)" },
+  adventure: { hidden: "translateY(-20px) scale(0.96)", duration: "0.5s", easing: "cubic-bezier(0.34,1.56,0.64,1)" },
+  chill:     { hidden: "translateY(16px)",              duration: "0.8s", easing: "ease" },
+};
+
+function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vibe, onAddToPlan, onFavorite, isFavorited }) {
   const t = theme || {};
   const [addMsg, setAddMsg] = useState("");
+  const [showEs, setShowEs] = useState(false);
+  const anim = VIBE_CARD_ANIM[vibe] || VIBE_CARD_ANIM.chill;
 
   async function handleAddToPlan() {
     if (onAddToPlan) {
@@ -1342,8 +1419,8 @@ function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPl
       border: `1px solid ${t.cardBorder || "rgba(255,255,255,0.12)"}`,
       boxShadow: `0 4px 24px ${t.accentGlow || "rgba(0,0,0,0.3)"}`,
       opacity: visible ? 1 : 0,
-      transform: visible ? "translateY(0)" : "translateY(24px)",
-      transition: "opacity 0.5s ease, transform 0.5s ease",
+      transform: visible ? "translateY(0) rotate(0deg) scale(1)" : anim.hidden,
+      transition: `opacity ${anim.duration} ${anim.easing}, transform ${anim.duration} ${anim.easing}`,
       filter: swapping ? "opacity(0.3)" : "none",
       pointerEvents: swapping ? "none" : "all",
     }}>
@@ -1393,8 +1470,21 @@ function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPl
         </div>
         {/* Pirate name + real name on photo bottom */}
         <div style={{ position:"absolute", bottom:12, left:14, right:14, zIndex:3 }}>
-          <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, color:"white", textShadow:"0 2px 8px rgba(0,0,0,0.8)" }}>
-            {bounty.pirate_name}
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"1.2rem", fontWeight:700, color:"white", textShadow:"0 2px 8px rgba(0,0,0,0.8)", flex:1 }}>
+              {showEs && bounty.pirate_name_es ? bounty.pirate_name_es : bounty.pirate_name}
+            </div>
+            {bounty.pirate_name_es && (
+              <button
+                onClick={() => setShowEs(s => !s)}
+                style={{
+                  background:"rgba(0,0,0,0.45)", border:"1px solid rgba(255,255,255,0.25)",
+                  borderRadius:20, padding:"0.15rem 0.55rem", fontSize:"0.62rem",
+                  color:"rgba(255,255,255,0.8)", cursor:"pointer", fontWeight:600,
+                  letterSpacing:"0.06em", backdropFilter:"blur(4px)", flexShrink:0,
+                }}
+              >{showEs ? "EN" : "ES"}</button>
+            )}
           </div>
           <div style={{ fontSize:"0.78rem", color:"rgba(255,255,255,0.65)", marginTop:2 }}>
             {bounty.name}{bounty.price_level ? " · " + "💰".repeat(bounty.price_level) : ""}
@@ -1414,18 +1504,25 @@ function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, onAddToPl
           "{bounty.hook}"
         </div>
 
-        {/* Open Now badge */}
+        {/* Open Now + closing time badge */}
         {bounty.open_now !== null && bounty.open_now !== undefined && (
-          <div style={{
-            display:"inline-flex", alignItems:"center", gap:5,
-            padding:"0.2rem 0.65rem", borderRadius:20, marginBottom:"0.65rem",
-            fontSize:"0.72rem", fontWeight:600, letterSpacing:"0.04em",
-            background: bounty.open_now ? "rgba(81,207,102,0.15)" : "rgba(255,107,107,0.12)",
-            border: `1px solid ${bounty.open_now ? "rgba(81,207,102,0.35)" : "rgba(255,107,107,0.3)"}`,
-            color: bounty.open_now ? "#51cf66" : "#ff6b6b",
-          }}>
-            <span style={{ fontSize:"0.55rem" }}>●</span>
-            {bounty.open_now ? "OPEN NOW" : "CURRENTLY CLOSED"}
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:"0.65rem", flexWrap:"wrap" }}>
+            <div style={{
+              display:"inline-flex", alignItems:"center", gap:5,
+              padding:"0.2rem 0.65rem", borderRadius:20,
+              fontSize:"0.72rem", fontWeight:600, letterSpacing:"0.04em",
+              background: bounty.open_now ? "rgba(81,207,102,0.15)" : "rgba(255,107,107,0.12)",
+              border: `1px solid ${bounty.open_now ? "rgba(81,207,102,0.35)" : "rgba(255,107,107,0.3)"}`,
+              color: bounty.open_now ? "#51cf66" : "#ff6b6b",
+            }}>
+              <span style={{ fontSize:"0.55rem" }}>●</span>
+              {bounty.open_now ? "OPEN NOW" : "CURRENTLY CLOSED"}
+            </div>
+            {bounty.closes_at && bounty.open_now && (
+              <span style={{ fontSize:"0.72rem", color: t.textMuted || "rgba(255,255,255,0.45)" }}>
+                Closes {bounty.closes_at}
+              </span>
+            )}
           </div>
         )}
         {/* Rating + address row */}
@@ -1909,16 +2006,26 @@ const BASE_CSS = `
   .how-title { font-family:'Playfair Display',serif; font-size:1.1rem; color:#0F2747; margin-bottom:0.5rem; }
   .how-text { font-size:0.88rem; color:#8a7a5a; line-height:1.6; }
 
-  /* ROUTES */
+  /* LEGENDARY VOYAGES */
   .routes-section { padding:5rem 3rem; max-width:1200px; margin:0 auto; position:relative; z-index:1; }
-  .routes-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; }
-  .route-card { border-radius:14px; overflow:hidden; border:1px solid #E0D4B8; background:white; transition:transform 0.2s, box-shadow 0.2s; cursor:pointer; }
-  .route-card:hover { transform:translateY(-3px); box-shadow:0 12px 40px rgba(15,39,71,0.12); }
-  .route-inner { padding:2rem 1.5rem 1.5rem; min-height:180px; display:flex; flex-direction:column; justify-content:flex-end; }
-  .route-badge { display:inline-block; background:#D4A96A; color:#0F2747; border-radius:40px; padding:0.25rem 0.75rem; font-size:0.72rem; font-weight:600; margin-bottom:1rem; align-self:flex-start; }
-  .route-emoji { font-size:2.2rem; margin-bottom:0.5rem; display:block; }
-  .route-title { font-family:'Playfair Display',serif; font-size:1rem; color:white; font-weight:600; margin-bottom:0.3rem; }
-  .route-meta { font-size:0.78rem; color:rgba(255,255,255,0.7); }
+  .routes-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.1rem; }
+  .voyage-card { border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s; }
+  .voyage-card:hover { transform:translateY(-4px) scale(1.01); box-shadow:0 16px 48px rgba(0,0,0,0.5); }
+  .voyage-inner {
+    padding:1.5rem; min-height:190px; display:flex; flex-direction:column; justify-content:flex-end;
+    background:linear-gradient(160deg, rgba(20,14,6,0.95) 0%, rgba(10,8,4,0.98) 100%);
+    border:1px solid rgba(212,169,106,0.15); position:relative; overflow:hidden;
+  }
+  .voyage-inner::before {
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(135deg, rgba(212,169,106,0.04) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .voyage-card:hover .voyage-cta { opacity:1; transform:translateY(0); }
+  .voyage-badge { display:inline-block; background:rgba(212,169,106,0.15); border:1px solid rgba(212,169,106,0.3); color:#C8A84B; border-radius:40px; padding:0.2rem 0.65rem; font-size:0.65rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; }
+  .voyage-title { font-family:'Playfair Display',serif; font-size:0.98rem; color:#F0DFA0; font-weight:600; margin-bottom:0.3rem; line-height:1.3; }
+  .voyage-meta { font-size:0.72rem; color:rgba(212,169,106,0.45); letter-spacing:0.05em; }
+  .voyage-cta { font-size:0.72rem; color:#D4A96A; font-weight:600; letter-spacing:0.08em; margin-top:0.7rem; opacity:0; transform:translateY(4px); transition:all 0.2s; }
 
   /* HERO BADGE */
   .hero-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(212,169,106,0.15); border:1px solid rgba(212,169,106,0.4); border-radius:40px; padding:0.35rem 1rem; font-size:0.72rem; font-weight:500; letter-spacing:0.1em; color:#8B6914; text-transform:uppercase; margin-bottom:1.5rem; }
@@ -2045,12 +2152,12 @@ const BASE_CSS = `
 `;
 
 const ROUTES_DATA = [
-  { title:"Hidden Cafés in Malasaña", badge:"Local Favorite", emoji:"☕", a:"#1a5a6e", b:"#0d3a4a", meta:"12 gems · Malasaña", barrio:"Malasaña", huntDesc:"Friends looking for hidden local cafés with character, avoiding tourist chains" },
-  { title:"Rooftop Night in Salamanca", badge:"Night Out", emoji:"🌙", a:"#1a3a62", b:"#0d2040", meta:"8 gems · Salamanca", barrio:"Salamanca", huntDesc:"Friends going out for drinks and night views, wants something special" },
-  { title:"Cheap Eats in Chamberí", badge:"Student Pick", emoji:"🍺", a:"#2a4a1a", b:"#122010", meta:"15 gems · Chamberí", barrio:"Chamberí", huntDesc:"Broke students who want cheap local food and drinks, no tourist spots" },
-  { title:"Romantic Spots in La Latina", badge:"Date Night", emoji:"🌹", a:"#5a1a3a", b:"#300a20", meta:"10 gems · La Latina", barrio:"La Latina", huntDesc:"A couple on a date wanting intimate cozy spots away from the crowds" },
-  { title:"Local Markets & Bookstores", badge:"Off the Map", emoji:"📚", a:"#2a3a1a", b:"#141e08", meta:"9 gems · Centro", barrio:"Sol / Centro", huntDesc:"Culture lovers looking for local markets, bookstores and hidden character spots" },
-  { title:"Secret Cocktail Bars in Chueca", badge:"Hidden Gem", emoji:"🍸", a:"#0d2a42", b:"#061420", meta:"11 gems · Chueca", barrio:"Chueca", huntDesc:"A group looking for secret cocktail bars and speakeasies in Chueca" },
+  { title:"Hidden Taverns of Malasaña", badge:"Local Legend", emoji:"🍺", a:"#1a0e04", b:"#0d0804", meta:"Malasaña · Food & Drink", barrio:"Malasaña", huntDesc:"Friends looking for hidden local taverns and bars with authentic character, avoiding tourist chains in Malasaña" },
+  { title:"Moonlit Terraces of Salamanca", badge:"Night Voyage", emoji:"🌙", a:"#04081a", b:"#02050f", meta:"Salamanca · Drinks & Views", barrio:"Salamanca", huntDesc:"Friends going out for drinks on hidden rooftop terraces and bars with night views in Salamanca" },
+  { title:"Broke Crew's Feast in Chamberí", badge:"Pirate Budget", emoji:"🪙", a:"#0a1004", b:"#060a02", meta:"Chamberí · Budget Feast", barrio:"Chamberí", huntDesc:"Broke students who want cheap authentic local food and drinks, no tourist spots in Chamberí" },
+  { title:"Secret Port of La Latina", badge:"Date Voyage", emoji:"🌹", a:"#1a040e", b:"#0f0208", meta:"La Latina · Romantic", barrio:"La Latina", huntDesc:"A couple on a date wanting intimate, cozy hidden spots with atmosphere in La Latina" },
+  { title:"Ancient Scrolls of Sol", badge:"Cultural Raid", emoji:"📜", a:"#0e0a04", b:"#08060202", meta:"Centro · Culture & History", barrio:"Sol / Centro", huntDesc:"Culture lovers looking for hidden historical spots, local galleries and character-filled places in Madrid Centro" },
+  { title:"Speakeasy Run in Chueca", badge:"Secret Cove", emoji:"🍸", a:"#04101a", b:"#020a12", meta:"Chueca · Cocktails", barrio:"Chueca", huntDesc:"A group looking for secret cocktail bars and speakeasies with hidden entrances in Chueca" },
 ];
 
 
@@ -2630,6 +2737,10 @@ export default function App() {
   const [routeInfo, setRouteInfo]     = useState(null);
   const [showRevealAnim, setShowRevealAnim] = useState(false);
   const [huntStage, setHuntStage]     = useState(0);
+  const [quietMode, setQuietMode]     = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [swapHistory, setSwapHistory] = useState([]);
+  const [vibeIntensity, setVibeIntensity] = useState("hidden");
 
   const currentVibe = preferences?.vibe || null;
   const theme = currentVibe ? VIBE_THEMES[currentVibe] : null;
@@ -2705,6 +2816,8 @@ export default function App() {
           roles: roleLabels,
           category: effectiveCategory,
           sort_mode: sortMode,
+          quiet_mode: quietMode,
+          vibe_intensity: vibeIntensity,
           day_of_week: effectiveCategory === "clubs" ? (clubDay || new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()) : new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase(),
           age_group: effectiveCategory === "clubs" ? (clubAge || "21-25") : undefined,
         }),
@@ -2747,6 +2860,8 @@ export default function App() {
     if (!sessionKey) return;
     setSwapping(rejectedId);
     const currentIds = bounties.map(b => b.place_id);
+    const rejectedBounty = bounties.find(b => b.place_id === rejectedId);
+    const rejectedIdx = bounties.findIndex(b => b.place_id === rejectedId);
     try {
       const res = await fetch(`${API}/api/swap`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -2754,12 +2869,21 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No replacement");
-      const idx = bounties.findIndex(b => b.place_id === rejectedId);
       setBounties(p => p.map(b => b.place_id === rejectedId ? data.bounty : b));
-      setVisible(p => p.filter(i => i !== idx));
-      setTimeout(() => setVisible(p => [...p, idx]), 200);
+      setVisible(p => p.filter(i => i !== rejectedIdx));
+      setTimeout(() => setVisible(p => [...p, rejectedIdx]), 200);
+      setSwapHistory(h => [{ bounty: rejectedBounty, index: rejectedIdx }, ...h].slice(0, 3));
     } catch (e) { setError(e.message); }
     finally { setSwapping(null); }
+  }
+
+  function undoLastSwap() {
+    if (!swapHistory.length) return;
+    const { bounty: original, index } = swapHistory[0];
+    setBounties(p => p.map((b, i) => i === index ? original : b));
+    setVisible(p => p.filter(i => i !== index));
+    setTimeout(() => setVisible(p => [...p, index]), 200);
+    setSwapHistory(h => h.slice(1));
   }
 
   function reset() {
@@ -2773,6 +2897,9 @@ export default function App() {
     setRouteInfo(null);
     setShowRevealAnim(false);
     setHuntStage(0);
+    setSwapHistory([]);
+    setIsListening(false);
+    setVibeIntensity("hidden");
     setBriefInputTab("crew");
     setCaptainPrompt("");
     setCaptainExtrasOpen(false);
@@ -2786,6 +2913,32 @@ export default function App() {
     setScreen("reveal");
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => entry.bounties?.forEach((_, i) => setTimeout(() => setVisible(p => [...p, i]), i * 400)), 100);
+  }
+
+  function buildMapsRouteUrl(bountiesList) {
+    if (!bountiesList.length) return "#";
+    if (bountiesList.length === 1) return bountiesList[0].maps_url;
+    const origin = `${bountiesList[0].lat},${bountiesList[0].lng}`;
+    const dest = `${bountiesList[bountiesList.length - 1].lat},${bountiesList[bountiesList.length - 1].lng}`;
+    const waypts = bountiesList.slice(1, -1).map(b => `${b.lat},${b.lng}`).join("|");
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypts ? `&waypoints=${waypts}` : ""}&travelmode=walking`;
+  }
+
+  function startVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert("Voice input not supported in this browser."); return; }
+    if (isListening) { setIsListening(false); return; }
+    const rec = new SR();
+    rec.lang = "en-US"; rec.continuous = false; rec.interimResults = false;
+    rec.onstart = () => setIsListening(true);
+    rec.onend = () => setIsListening(false);
+    rec.onerror = () => setIsListening(false);
+    rec.onresult = e => {
+      const transcript = e.results[0][0].transcript;
+      setCaptainPrompt(p => p ? p + " " + transcript : transcript);
+      setBriefInputTab("capitan");
+    };
+    rec.start();
   }
 
   function shareText() {
@@ -2929,8 +3082,7 @@ export default function App() {
           />
           <section className="hero hero-brief-unified">
             <div className="brief-hero-column">
-              <div className="hero-badge fu fu1">AI-Powered Hidden Gem Finder</div>
-              <h1 className="hero-headline fu fu2">
+              <h1 className="hero-headline fu fu1">
                 Chart your course.
                 <em>We&apos;ll find the treasure.</em>
               </h1>
@@ -3086,18 +3238,33 @@ export default function App() {
                   <>
                     <div className="capitan-row">
                       <label className="input-label" style={{ marginBottom: 0 }}>Captain&apos;s orders</label>
-                      <button
-                        type="button"
-                        className={`capitan-plus ${captainExtrasOpen ? "open" : ""}`}
-                        onClick={() => setCaptainExtrasOpen((o) => !o)}
-                        aria-expanded={captainExtrasOpen}
-                        aria-label={captainExtrasOpen ? "Hide crew and map options" : "Show crew and map options"}
-                      >
-                        {captainExtrasOpen ? "−" : "+"}
-                      </button>
+                      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        <button
+                          type="button"
+                          onClick={startVoice}
+                          title={isListening ? "Stop listening" : "Speak your brief"}
+                          style={{
+                            width:34, height:34, borderRadius:"50%", border:"none", cursor:"pointer",
+                            background: isListening ? "rgba(255,60,60,0.15)" : "rgba(15,39,71,0.08)",
+                            color: isListening ? "#ff4444" : "#6b5c48",
+                            fontSize:"1rem", display:"flex", alignItems:"center", justifyContent:"center",
+                            animation: isListening ? "scanPulse 1.2s ease-out infinite" : "none",
+                            transition:"all 0.2s",
+                          }}
+                        >🎙</button>
+                        <button
+                          type="button"
+                          className={`capitan-plus ${captainExtrasOpen ? "open" : ""}`}
+                          onClick={() => setCaptainExtrasOpen((o) => !o)}
+                          aria-expanded={captainExtrasOpen}
+                          aria-label={captainExtrasOpen ? "Hide crew and map options" : "Show crew and map options"}
+                        >
+                          {captainExtrasOpen ? "−" : "+"}
+                        </button>
+                      </div>
                     </div>
                     <p style={{ fontSize: "0.78rem", color: "#8a7a5a", marginBottom: "0.65rem", fontStyle: "italic", lineHeight: 1.45 }}>
-                      Speak freely to the navigator — then use + to layer neighborhood, crew roles, and sorting when you want precision.
+                      {isListening ? "🔴 Listening… speak your orders" : "Speak freely — tap 🎙 to use voice, or use + for more options."}
                     </p>
                     <textarea
                       className="input-textarea"
@@ -3195,11 +3362,79 @@ export default function App() {
                   </>
                 )}
 
+                {/* Quiet mode toggle */}
+                <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", margin:"0.75rem 0 0.5rem", padding:"0.55rem 0.85rem", borderRadius:12, background:"rgba(15,39,71,0.04)", border:"1px solid rgba(15,39,71,0.08)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setQuietMode(q => !q)}
+                    style={{
+                      width:36, height:20, borderRadius:10, border:"none", cursor:"pointer", padding:2,
+                      background: quietMode ? "#0F2747" : "#d0c8b8", transition:"background 0.25s", flexShrink:0,
+                      display:"flex", alignItems:"center",
+                    }}
+                    aria-pressed={quietMode}
+                    aria-label="Avoid crowds"
+                  >
+                    <span style={{
+                      width:16, height:16, borderRadius:"50%", background:"white", display:"block",
+                      transform: quietMode ? "translateX(16px)" : "translateX(0)",
+                      transition:"transform 0.25s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)",
+                    }}/>
+                  </button>
+                  <span style={{ fontSize:"0.78rem", color:"#4a3820", fontWeight:500 }}>Avoid crowds</span>
+                  <span style={{ fontSize:"0.72rem", color:"#8a7a5a", marginLeft:2 }}>— prefer places with &lt;150 reviews</span>
+                </div>
+
+                {/* Description preview (Crew mode) */}
+                {briefInputTab === "crew" && (selectedRoles.length > 0 || selectedBarrio) && (
+                  <div style={{ fontSize:"0.75rem", color:"#6b5c48", fontStyle:"italic", background:"rgba(212,169,106,0.07)", borderRadius:10, padding:"0.5rem 0.8rem", marginBottom:"0.4rem", border:"1px solid rgba(212,169,106,0.15)", lineHeight:1.5 }}>
+                    Finding <strong>{selectedCategory === "restaurants_bars" ? "food & drink" : selectedCategory === "museums" ? "cultural spots" : selectedCategory === "clubs" ? "nightlife" : "hidden gems"}</strong>
+                    {selectedBarrio ? ` in ${selectedBarrio.name}` : " across Madrid"}
+                    {selectedRoles.length > 0 ? ` for ${selectedRoles.map(id => CREW_ROLES.find(r => r.id === id)?.label).filter(Boolean).join(", ")}` : ""}
+                    {quietMode ? " · avoiding crowds" : ""}…
+                  </div>
+                )}
+
+                {/* Vibe intensity selector */}
+                <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", margin:"0.75rem 0 0.5rem" }}>
+                  <span style={{ fontSize:"0.72rem", color:"#6b5c48", fontWeight:500, flexShrink:0 }}>Exclusivity</span>
+                  {[{id:"local",label:"Local",desc:"<1500 reviews"},{id:"hidden",label:"Hidden",desc:"<800 reviews"},{id:"secret",label:"Secret",desc:"<250 reviews"}].map(v => (
+                    <button key={v.id} type="button" onClick={() => setVibeIntensity(v.id)} title={v.desc} style={{
+                      flex:1, padding:"0.35rem 0", border:"1px solid", borderRadius:8, cursor:"pointer", fontSize:"0.7rem", fontWeight:600,
+                      transition:"all 0.2s",
+                      borderColor: vibeIntensity === v.id ? "#0F2747" : "rgba(15,39,71,0.15)",
+                      background: vibeIntensity === v.id ? "#0F2747" : "transparent",
+                      color: vibeIntensity === v.id ? "white" : "#6b5c48",
+                    }}>{v.label}</button>
+                  ))}
+                </div>
+
                 <button type="button" className="sail-btn-premium" onClick={() => startHunt()} disabled={!canSail}>
                   {getSailLabel()} <span style={{color:"#D4A96A",marginLeft:4}}>→</span>
                 </button>
-                <button className="surprise-btn" onClick={() => setScreen("surprise")}>
-                  Surprise Me — Let the Navigator Decide
+
+                {/* Take Me There Now */}
+                <button type="button" onClick={() => {
+                  navigator.geolocation?.getCurrentPosition(pos => {
+                    setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                  }, () => {});
+                  const hour = new Date().getHours();
+                  const cat = hour >= 22 || hour < 4 ? "clubs" : hour >= 18 ? "restaurants_bars" : "museums";
+                  const descs = {
+                    clubs: "A late-night adventure — take me somewhere extraordinary and unexpected right now, locals only",
+                    restaurants_bars: "Take me somewhere amazing for food or drinks right now, hidden gem, locals only, no tourist traps",
+                    museums: "Take me to a hidden cultural gem in Madrid right now, something special off the tourist trail",
+                  };
+                  setSelectedCategory(cat);
+                  startHunt(descs[cat], null);
+                }} style={{
+                  width:"100%", marginTop:"0.5rem", padding:"0.7rem", borderRadius:12,
+                  background:"rgba(212,169,106,0.08)", border:"1px solid rgba(212,169,106,0.25)",
+                  color:"#8B6914", fontSize:"0.82rem", fontWeight:600, cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                  transition:"all 0.2s", letterSpacing:"0.04em",
+                }}>
+                  ⚓ Take Me There Now — Use My Location
                 </button>
                 <p className="sail-tagline">3 hidden gems · Pirate-voiced picks · Google Maps links</p>
                 {error && <div className="err-box">⚠️ {error}</div>}
@@ -3245,36 +3480,29 @@ export default function App() {
           <hr className="divider"/>
 
           <section className="routes-section" id="routes">
-            <h2 className="sec-headline">Popular Treasure Routes</h2>
-            <p className="sec-sub" style={{marginBottom:"2.5rem"}}>Explore some of Madrid's favourite local routes.</p>
-            <div className="routes-grid">
-              {ROUTES_DATA.map(r=>(
-                <div key={r.title} className="route-card"
-                  onClick={()=>startHunt(r.huntDesc, BARRIOS.find(b=>b.name===r.barrio)||null)}>
-                  <div className="route-inner" style={{background:`linear-gradient(135deg,${r.a},${r.b})`}}>
-                    <span className="route-badge">{r.badge}</span>
-                    <span className="route-emoji">{r.emoji}</span>
-                    <div className="route-title">{r.title}</div>
-                    <div className="route-meta">{r.meta}</div>
-                  </div>
-                </div>
-              ))}
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:"2.5rem" }}>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(212,169,106,0.1)", border:"1px solid rgba(212,169,106,0.25)", borderRadius:40, padding:"0.3rem 1rem", marginBottom:"0.85rem", fontSize:"0.7rem", letterSpacing:"0.12em", color:"#8B6914", fontWeight:600, textTransform:"uppercase" }}>✦ Quick Sail ✦</div>
+              <h2 className="sec-headline" style={{ marginBottom:"0.5rem" }}>Legendary Voyages of Madrid</h2>
+              <p className="sec-sub">Six curated routes — click to sail instantly.</p>
             </div>
-          </section>
-
-          <div className="rope-divider"><span>⚓</span></div>
-
-          <section className="vibe-section" id="vibes">
-            <h2 className="sec-headline">Choose Your Vibe</h2>
-            <p className="sec-sub">Pick a mood and let the navigator chart your course.</p>
-            <div className="vibe-grid">
-              {Object.entries(VIBE_THEMES).map(([key,t])=>(
-                <div key={key} className="vibe-tile"
-                  style={{background:t.isDay?"rgba(250,246,234,0.95)":t.cardBg, border:`1.5px solid ${t.cardBorder}`, color:t.isDay?"#2a1a08":t.textPrimary}}
-                  onClick={()=>startHunt(`${t.tagline} Find hidden spots in Madrid matching this vibe.`, null)}>
-                  <span className="vibe-tile-icon">{t.icon}</span>
-                  <span className="vibe-tile-label" style={{color:t.isDay?"#2a1a08":t.textPrimary}}>{t.label}</span>
-                  <span className="vibe-tile-sub" style={{color:t.isDay?"#8a7a5a":t.textMuted}}>{t.tagline}</span>
+            <div className="routes-grid">
+              {ROUTES_DATA.map((r, idx) => (
+                <div key={r.title} className="route-card voyage-card"
+                  onClick={() => startHunt(r.huntDesc, BARRIOS.find(b => b.name === r.barrio) || null)}>
+                  <div className="voyage-inner">
+                    {/* Top row: badge + emoji */}
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"0.9rem" }}>
+                      <span className="voyage-badge">{r.badge}</span>
+                      <span style={{ fontSize:"1.4rem", opacity:0.85, filter:"drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }}>{r.emoji}</span>
+                    </div>
+                    {/* Route number */}
+                    <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"0.65rem", color:"rgba(212,169,106,0.5)", letterSpacing:"0.2em", marginBottom:"0.3rem", textTransform:"uppercase" }}>
+                      Voyage {String(idx + 1).padStart(2, "0")}
+                    </div>
+                    <div className="voyage-title">{r.title}</div>
+                    <div className="voyage-meta">{r.meta}</div>
+                    <div className="voyage-cta">Set Sail →</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -3443,6 +3671,26 @@ export default function App() {
                   {theme.tagline}
                 </p>
               )}
+              {/* Cost estimator */}
+              {preferences && bounties.length > 0 && (() => {
+                const avgLevel = Math.round(bounties.reduce((s, b) => s + (b.price_level || 2), 0) / bounties.length);
+                const ranges = { 1:[5,12], 2:[12,22], 3:[25,45], 4:[45,80] };
+                const [lo, hi] = ranges[avgLevel] || [12,22];
+                const group = preferences.group_size || 3;
+                return (
+                  <div style={{
+                    display:"inline-flex", alignItems:"center", gap:8, marginTop:"0.65rem",
+                    background:"rgba(212,169,106,0.12)", border:"1px solid rgba(212,169,106,0.28)",
+                    borderRadius:30, padding:"0.35rem 1.1rem",
+                    fontSize:"0.78rem", color: theme?.goldColor || "#D4A96A", fontWeight:500,
+                  }}>
+                    <span>💰</span>
+                    <span>Est. €{lo}–€{hi} per person</span>
+                    <span style={{opacity:0.4}}>·</span>
+                    <span>€{lo*group}–€{hi*group} total for {group}</span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Treasure map */}
@@ -3490,7 +3738,7 @@ export default function App() {
               {bounties.map((b,i)=>(
                 <ScrollCard key={b.place_id} bounty={b} index={i}
                   visible={visibleCards.includes(i)} onSwap={swapBounty}
-                  swapping={swappingId===b.place_id} theme={theme}
+                  swapping={swappingId===b.place_id} theme={theme} vibe={currentVibe}
                   onFavorite={user ? handleFavorite : null}
                   isFavorited={favoritedIds.has(b.place_id)}
                   onAddToPlan={user ? openAddToPlan : null}
@@ -3499,6 +3747,20 @@ export default function App() {
             </div>
 
             {error && <div className="err-box" style={{marginBottom:"1rem"}}>⚠️ {error}</div>}
+
+            {/* Undo last swap */}
+            {swapHistory.length > 0 && (
+              <div style={{ textAlign:"center", marginBottom:"0.75rem" }}>
+                <button onClick={undoLastSwap} style={{
+                  background:"rgba(212,169,106,0.1)", border:"1px solid rgba(212,169,106,0.3)",
+                  color: theme?.goldColor || "#D4A96A", borderRadius:30, padding:"0.45rem 1.2rem",
+                  fontSize:"0.78rem", cursor:"pointer", fontFamily:"'DM Sans',sans-serif",
+                  transition:"all 0.2s",
+                }}>
+                  ↩ Undo last swap — bring back {swapHistory[0].bounty.pirate_name}
+                </button>
+              </div>
+            )}
 
             <div className="bot-actions">
               <button className="bot-btn" onClick={reset} style={{
@@ -3512,6 +3774,13 @@ export default function App() {
               <button className="bot-btn" onClick={()=>setShowShare(true)} style={{
                 background: theme?.goldColor || "#D4A96A", color:"#0F2747",
               }}>🖼 Share Card</button>
+              {bounties.length > 1 && (
+                <a href={buildMapsRouteUrl(bounties)} target="_blank" rel="noopener noreferrer" className="bot-btn" style={{
+                  background:"rgba(66,133,244,0.18)", color:"#8ab4f8",
+                  border:"1px solid rgba(66,133,244,0.3)", textDecoration:"none",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+                }}>🗺 Navigate All Stops</a>
+              )}
             </div>
           </div>
 

@@ -56,7 +56,7 @@ FALLBACK_GEMS = {
 
 def get_place_details(place_id):
     if not MAPS_KEY or str(place_id).startswith("fb_"):
-        return {"open_now": None}
+        return {"open_now": None, "closes_at": None}
     ck = cache_key("details", place_id)
     if ck in _cache:
         return _cache[ck]
@@ -67,12 +67,25 @@ def get_place_details(place_id):
         data = resp.json()
         if data.get("status") == "OK":
             hours = data.get("result", {}).get("opening_hours", {})
-            result = {"open_now": hours.get("open_now")}
+            open_now = hours.get("open_now")
+            closes_at = None
+            periods = hours.get("periods", [])
+            if periods:
+                now = datetime.now()
+                # Google uses 0=Sun … 6=Sat; Python weekday() is 0=Mon … 6=Sun
+                google_dow = (now.weekday() + 1) % 7
+                for period in periods:
+                    if period.get("open", {}).get("day") == google_dow:
+                        close_time = (period.get("close") or {}).get("time", "")
+                        if len(close_time) == 4:
+                            closes_at = f"{close_time[:2]}:{close_time[2:]}"
+                        break
+            result = {"open_now": open_now, "closes_at": closes_at}
             _cache[ck] = result
             return result
     except Exception as e:
         print(f"[Places Details] {e}")
-    return {"open_now": None}
+    return {"open_now": None, "closes_at": None}
 
 def get_fallback_gems(category="restaurants_bars", lat=40.4168, lng=-3.7038):
     gems = list(FALLBACK_GEMS.get(category, FALLBACK_GEMS["restaurants_bars"]))
@@ -262,12 +275,12 @@ def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, da
     if status not in ("OK", "ZERO_RESULTS"):
         raise Exception(f"Places API error: {status} — {data.get('error_message', '')}")
 
-    results = data.get("results", [])[:15]
+    results = data.get("results", [])[:20]
     if results:
         _cache[ck] = results
     return results
 
-def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="auto", sort_mode="popularity", day_of_week=None, age_group=None):
+def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="auto", sort_mode="popularity", day_of_week=None, age_group=None, quiet_mode=False, vibe_intensity="hidden", relaxed=False):
     if exclude_ids is None:
         exclude_ids = []
     places_summary = [
@@ -282,6 +295,10 @@ def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="
     if category == "clubs":
         age_line = f" Target age group: {age_group}." if age_group else ""
         day_line = f"\nToday is {normalize_day(day_of_week)}.{age_line} Prioritize clubs that fit that day's nightlife energy."
+    intensity_limits = {"local": 1500, "hidden": 800, "secret": 250}
+    review_limit = 9999 if relaxed else (150 if quiet_mode else intensity_limits.get(vibe_intensity, 800))
+    review_rule = f"- You MUST return exactly {count} results. If strict review limits prevent this, include the best available options regardless of review count." if relaxed else f"- Prefer places with under {review_limit} reviews; if you cannot find {count} qualifying results, include the best remaining options"
+    quiet_line = "\n- PRIORITY: prefer venues with under 150 reviews — intimate, local, quiet spots only" if quiet_mode else ""
 
     prompt = f"""You are a grizzled pirate navigator helping a crew find their next destination in Madrid, Spain.
 The crew vibe is: {preferences['vibe']}, budget: {preferences['budget']}.
@@ -289,17 +306,18 @@ Chosen chest category: {category}. Sort priority: {sort_mode}.
 Things to avoid: {preferences['avoid']}.{special_line}{day_line}
 From this list of real places, pick the {count} best hidden gems.
 Rules:
-- Reject any chains or franchises (McDonalds, Starbucks, VIPS, etc)
-- Reject places with more than 500 reviews (too popular = not hidden)
+- Avoid chains or franchises (McDonalds, Starbucks, VIPS, etc) unless no other option exists
+{review_rule}
 - Pick places that match the vibe and budget
 - If budget is broke, avoid places with price_level 3 or 4
 - If there is a special occasion, factor it into the hook
+- You MUST return a JSON array with exactly {count} objects — no fewer{quiet_line}
 Return ONLY a JSON array, no extra text, no markdown:
-[{{"name":"exact original place name","pirate_name":"dramatic pirate nickname max 4 words","hook":"one sentence pirate voice max 15 words","send_off":"short pirate encouragement max 8 words","place_id":"exact place_id from input"}}]
+[{{"name":"exact original place name","pirate_name":"dramatic pirate nickname max 4 words","pirate_name_es":"mismo apodo en español max 4 palabras","hook":"one sentence pirate voice max 15 words","send_off":"short pirate encouragement max 8 words","place_id":"exact place_id from input"}}]
 Places to choose from:
 {json.dumps(places_summary, indent=2)}"""
 
-    ck = cache_key("dossier", preferences["vibe"], preferences["budget"], category, sort_mode, normalize_day(day_of_week), [p["place_id"] for p in places_summary], tuple(exclude_ids))
+    ck = cache_key("dossier", preferences["vibe"], preferences["budget"], category, sort_mode, normalize_day(day_of_week), [p["place_id"] for p in places_summary], tuple(exclude_ids), quiet_mode, vibe_intensity, relaxed)
     if ck in _cache:
         return _cache[ck]
     raw = call_gemini_with_retry(prompt, temperature=0.8)
@@ -307,17 +325,18 @@ Places to choose from:
     _cache[ck] = result
     return result
 
-def build_bounties(dossiers, places):
+def build_bounties(dossiers, places, base_url="http://localhost:5001"):
     bounties = []
     for d in dossiers:
         match = next((p for p in places if p.get("place_id") == d.get("place_id")), None)
         if match:
-            photo_ref = match.get("photos", [{}])[0].get("photo_reference")
-            photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference={photo_ref}&key={MAPS_KEY}" if photo_ref else None
+            photo_ref = (match.get("photos") or [{}])[0].get("photo_reference")
+            photo_url = f"{base_url}/api/photo?ref={photo_ref}" if photo_ref else None
             details = get_place_details(d.get("place_id"))
             bounties.append({
                 "name": d.get("name"),
                 "pirate_name": d.get("pirate_name"),
+                "pirate_name_es": d.get("pirate_name_es"),
                 "hook": d.get("hook"),
                 "send_off": d.get("send_off"),
                 "place_id": d.get("place_id"),
@@ -329,8 +348,28 @@ def build_bounties(dossiers, places):
                 "photo_url": photo_url,
                 "price_level": match.get("price_level"),
                 "open_now": details.get("open_now"),
+                "closes_at": details.get("closes_at"),
             })
     return bounties
+
+@app.route("/api/photo")
+def photo_proxy():
+    ref = request.args.get("ref", "").strip()
+    if not ref or not MAPS_KEY:
+        return ("", 404)
+    url = "https://maps.googleapis.com/maps/api/place/photo"
+    params = {"maxwidth": 800, "photo_reference": ref, "key": MAPS_KEY}
+    try:
+        resp = requests.get(url, params=params, timeout=8, allow_redirects=True)
+        if resp.status_code == 200:
+            return (resp.content, 200, {
+                "Content-Type": resp.headers.get("Content-Type", "image/jpeg"),
+                "Cache-Control": "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+            })
+    except Exception as e:
+        print(f"[Photo proxy] {e}")
+    return ("", 502)
 
 @app.route("/api/hunt", methods=["POST"])
 def hunt():
@@ -344,6 +383,8 @@ def hunt():
     sort_mode = (data.get("sort_mode") or "popularity").strip().lower()
     day_of_week = normalize_day(data.get("day_of_week"))
     age_group = (data.get("age_group") or "").strip().lower()
+    quiet_mode = bool(data.get("quiet_mode", False))
+    vibe_intensity = (data.get("vibe_intensity") or "hidden").strip().lower()
 
     if not crew_description:
         return jsonify({"error": "No description provided"}), 400
@@ -366,9 +407,11 @@ def hunt():
         return jsonify({"error": "No places found nearby (ZERO_RESULTS) — try a different neighbourhood or vibe"}), 404
     ranked_places = rank_places(places, sort_mode, lat, lng, preferences.get("budget", "medium"))
 
+    base_url = request.host_url.rstrip("/")
     try:
         dossiers = generate_dossiers(
-            ranked_places, preferences, category=category, sort_mode=sort_mode, day_of_week=day_of_week, age_group=age_group
+            ranked_places, preferences, category=category, sort_mode=sort_mode,
+            day_of_week=day_of_week, age_group=age_group, quiet_mode=quiet_mode, vibe_intensity=vibe_intensity
         )
     except Exception as e:
         err = str(e)
@@ -376,7 +419,18 @@ def hunt():
             return jsonify({"error": "Gemini quota limit. Try again in a minute.", "quota_error": True}), 429
         return jsonify({"error": f"Could not generate dossiers: {err}"}), 500
 
-    bounties = build_bounties(dossiers, ranked_places)
+    bounties = build_bounties(dossiers, ranked_places, base_url)
+
+    # If Gemini returned fewer than 3, retry with relaxed constraints
+    if len(bounties) < 3:
+        try:
+            relaxed_dossiers = generate_dossiers(
+                ranked_places, preferences, category=category, sort_mode=sort_mode,
+                day_of_week=day_of_week, age_group=age_group, quiet_mode=False, relaxed=True
+            )
+            bounties = build_bounties(relaxed_dossiers, ranked_places, base_url)
+        except Exception:
+            pass
 
     session_key = cache_key("session", lat, lng, crew_description, category, sort_mode, day_of_week)
     _cache[session_key] = {
@@ -437,7 +491,8 @@ def swap():
     if not dossiers:
         return jsonify({"error": "No more hidden gems to show — the seas are empty!"}), 404
 
-    bounties = build_bounties(dossiers, places)
+    base_url = request.host_url.rstrip("/")
+    bounties = build_bounties(dossiers, places, base_url)
     if not bounties:
         return jsonify({"error": "No replacement found nearby"}), 404
 
