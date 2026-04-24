@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { VIBE_CARD_ANIM } from "../constants";
+import { renderStoryPng } from "./StoryExport";
 
 // ─── CONFIRM SWAP BUTTON ──────────────────────────────────────────
 export function ConfirmSwapButton({ onConfirm, swapping, theme }) {
@@ -40,6 +41,27 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
   const t = theme || {};
   const [addMsg, setAddMsg] = useState("");
   const [showEs, setShowEs] = useState(false);
+  const [storyBusy, setStoryBusy] = useState(false);
+
+  async function handleStoryExport() {
+    if (storyBusy) return;
+    setStoryBusy(true);
+    try {
+      const url = await renderStoryPng(bounty);
+      const a = document.createElement("a");
+      const slug = (bounty.place_id || bounty.name || "bounty").toString().replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
+      a.href = url;
+      a.download = `rumbo-${slug}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (err) {
+      console.warn("Story export failed", err);
+    } finally {
+      setStoryBusy(false);
+    }
+  }
   const anim = VIBE_CARD_ANIM[vibe] || VIBE_CARD_ANIM.chill;
   const crowd = getCrowdLevel(bounty);
   const streetViewUrl = bounty.lat && bounty.lng ? `https://www.google.com/maps?layer=c&cbll=${bounty.lat},${bounty.lng}` : null;
@@ -212,6 +234,35 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
               display:"flex", alignItems:"center", justifyContent:"center",
             }}>👁</a>
           )}
+          <button
+            type="button"
+            onClick={handleStoryExport}
+            disabled={storyBusy}
+            title="Download Instagram story"
+            aria-label="Download Instagram story"
+            style={{
+              background: storyBusy ? "rgba(212,169,106,0.18)" : "rgba(212,169,106,0.10)",
+              border: `1px solid ${t.goldColor ? `${t.goldColor}55` : "rgba(212,169,106,0.35)"}`,
+              color: t.goldColor || "#D4A96A",
+              borderRadius: 10,
+              padding: "0.75rem 0.7rem",
+              fontSize: "0.9rem",
+              cursor: storyBusy ? "wait" : "pointer",
+              whiteSpace: "nowrap",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.15s, background 0.15s",
+            }}
+          >
+            {storyBusy ? (
+              <span style={{ fontSize: "0.75rem", letterSpacing: "0.06em" }}>…</span>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3v13" />
+                <path d="M6 9l6-6 6 6" />
+                <path d="M5 21h14" />
+              </svg>
+            )}
+          </button>
           <ConfirmSwapButton onConfirm={() => onSwap(bounty.place_id)} swapping={swapping} theme={t} />
         </div>
       </div>

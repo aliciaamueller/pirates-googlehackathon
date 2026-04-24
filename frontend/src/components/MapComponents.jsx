@@ -1,25 +1,28 @@
 import { useState, useEffect, useRef } from "react";
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap } from "@vis.gl/react-google-maps";
-import { PIRATE_MAP_STYLE } from "../constants";
 
 const MAPS_API_KEY = import.meta.env.VITE_MAPS_API_KEY;
 
 // ─── REAL GOOGLE MAP ──────────────────────────────────────────────
+// Notes on the Maps config:
+// - We always pass a mapId because <AdvancedMarker> requires one.
+// - We do NOT pass `styles` — Maps ignores it when mapId is present and logs a
+//   warning. Day/night styling should be configured on the mapId itself in the
+//   Google Cloud console (Map Styles), which is why this component accepts the
+//   `theme` prop but only uses it for marker colors.
+// - APIProvider owns the loader so Google's SDK is loaded asynchronously with
+//   options set — do NOT add a <script> tag for maps in index.html.
 export const RealMap = ({ bounties = [], scanning = false, center, theme, onRouteInfo }) => {
   const [selected, setSelected] = useState(null);
   const mapCenter = center || (bounties[0] ? { lat: bounties[0].lat, lng: bounties[0].lng } : { lat: 40.4168, lng: -3.7038 });
   const zoom = bounties.length > 0 ? 14 : 13;
 
-  // Use day style for chill, dark pirate style for everything else
-  const mapId = theme?.isDay ? "roadmap" : "DEMO_MAP_ID";
-
   return (
-    <APIProvider apiKey={MAPS_API_KEY}>
+    <APIProvider apiKey={MAPS_API_KEY} solutionChannel="GMP_visgl_rgmlibrary_v1_default">
       <Map
         defaultCenter={mapCenter}
         defaultZoom={zoom}
-        mapId={mapId}
-        styles={theme?.isDay ? [] : PIRATE_MAP_STYLE}
+        mapId="DEMO_MAP_ID"
         disableDefaultUI={false}
         gestureHandling="greedy"
         style={{ width:"100%", height:"100%", borderRadius:"16px" }}

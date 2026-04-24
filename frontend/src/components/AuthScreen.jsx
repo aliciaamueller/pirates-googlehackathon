@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 
 // ─── AUTH SCREEN ──────────────────────────────────────────────────
-export function AuthScreen({ onLogin }) {
-  const [isLogin, setIsLogin] = useState(true);
+export function AuthScreen({ onLogin, onBack = null, initialMode = "login" }) {
+  const [isLogin, setIsLogin] = useState(initialMode !== "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setIsLogin(initialMode !== "signup");
+  }, [initialMode]);
 
   const handleSubmit = async () => {
     setLoading(true); setError(""); setMessage("");
@@ -31,6 +35,15 @@ export function AuthScreen({ onLogin }) {
   return (
     <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"linear-gradient(160deg,#F7F4EE 0%,#EDE6D4 60%,#e0d8c0 100%)" }}>
       <div style={{ background:"#0F2747", borderRadius:"24px", padding:"48px", width:"100%", maxWidth:"420px", boxShadow:"0 25px 60px rgba(15,39,71,0.35)", border:"1px solid rgba(212,169,106,0.2)" }}>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            style={{ background:"transparent", border:"none", color:"rgba(212,169,106,0.9)", cursor:"pointer", fontSize:"13px", marginBottom:"18px" }}
+          >
+            ← Back
+          </button>
+        )}
         <div style={{ textAlign:"center", marginBottom:"32px" }}>
           <div style={{ fontSize:"44px", marginBottom:"8px" }}>🧭</div>
           <h1 style={{ color:"#F7F4EE", fontSize:"26px", fontFamily:"'Playfair Display',serif", fontWeight:700, margin:0 }}>RUMBO</h1>

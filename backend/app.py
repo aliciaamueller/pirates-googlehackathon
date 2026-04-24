@@ -11,6 +11,8 @@ import random
 from datetime import datetime
 from agent import get_agent_response, CREW
 
+_root = os.path.dirname(os.path.dirname(__file__))
+load_dotenv(os.path.join(_root, ".env"), override=True)
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 app = Flask(__name__)
 CORS(app)
@@ -100,6 +102,32 @@ def get_fallback_gems(category="restaurants_bars", lat=40.4168, lng=-3.7038):
 def cache_key(*args):
     raw = json.dumps(args, sort_keys=True)
     return hashlib.md5(raw.encode()).hexdigest()
+
+def fetch_madrid_weather():
+    """Keyless Madrid weather via wttr.in, cached in 15-minute buckets.
+    Failures degrade to a neutral/unknown payload — never raise."""
+    ck = cache_key("weather", "madrid", int(time.time() // 900))
+    if ck in _cache:
+        return _cache[ck]
+    w = {"temp_c": None, "condition": "unknown", "is_rainy": False, "is_cold": False, "is_hot": False}
+    try:
+        r = requests.get("https://wttr.in/Madrid?format=j1", timeout=4)
+        cur = r.json()["current_condition"][0]
+        temp = int(cur.get("temp_C", 0))
+        condition = cur["weatherDesc"][0]["value"]
+        cond_lower = condition.lower()
+        precip = float(cur.get("precipMM", 0) or 0)
+        w = {
+            "temp_c": temp,
+            "condition": condition,
+            "is_rainy": ("rain" in cond_lower) or ("drizzle" in cond_lower) or ("shower" in cond_lower) or precip > 0.2,
+            "is_cold": temp < 10,
+            "is_hot": temp > 28,
+        }
+    except Exception as e:
+        print(f"[weather] fetch failed: {e}")
+    _cache[ck] = w
+    return w
 
 def call_gemini_with_retry(prompt, temperature=0.8, max_retries=4):
     api_key = os.getenv("GEMINI_API_KEY")
@@ -282,7 +310,7 @@ def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, da
         _cache[ck] = results
     return results
 
-def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="auto", sort_mode="popularity", day_of_week=None, age_group=None, quiet_mode=False, vibe_intensity="hidden", relaxed=False):
+def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="auto", sort_mode="popularity", day_of_week=None, age_group=None, quiet_mode=False, vibe_intensity="hidden", relaxed=False, weather=None, moment=None):
     if exclude_ids is None:
         exclude_ids = []
     places_summary = [
@@ -305,10 +333,39 @@ def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="
     review_rule = f"- You MUST return exactly {count} results. If strict review limits prevent this, include the best available options regardless of review count." if relaxed else f"- Prefer places with under {review_limit} reviews; if you cannot find {count} qualifying results, include the best remaining options"
     quiet_line = "\n- PRIORITY: prefer venues with under 150 reviews — intimate, local, quiet spots only" if quiet_mode else ""
 
+    # Moment-of-day rhythm guidance — shapes venue energy (slow cafés vs speakeasies).
+    moment_line = ""
+    if moment:
+        rhythms = {
+            "breakfast": "breakfast (Madrid: 06–11) — slow cafés, panaderías, churrerías, quiet terrazas with coffee and pastry.",
+            "lunch": "lunch (Madrid: 11–16) — menú del día spots, traditional tabernas, family-run restaurants with a midday rhythm.",
+            "tapas": "tapas (Madrid: 16–19) — counter-service tapas bars with character, vermut joints, street-facing cañas.",
+            "cena": "dinner (Madrid: 19–23) — sit-down restaurants with atmosphere, intimate dining rooms, chef-led kitchens.",
+            "copas": "drinks (Madrid: 23–02) — cocktail caves, vermuterías, candlelit bars, speakeasy-style lounges.",
+            "late": "late night (Madrid: 02–06) — after-hours speakeasies, dive bars with soul, live-music basements, 24h tabernas.",
+        }
+        rhythm = rhythms.get(moment)
+        if rhythm:
+            moment_line = f"\n- Current moment of the day: {rhythm} Strongly prefer venues whose natural energy fits this window — reject picks that feel out-of-hour."
+
+    # Weather-aware guidance — only added when we have real data.
+    weather_line = ""
+    if weather and weather.get("condition") and weather.get("condition") != "unknown":
+        rules = []
+        if weather.get("is_rainy"):
+            rules.append("It's raining right now — AVOID rooftops, open-air terraces, and venues whose main draw is outdoor seating. FAVOR cozy indoor cellars, tabernas, covered patios, and places with fireplaces.")
+        if weather.get("is_cold"):
+            rules.append("It's cold (under 10°C) — FAVOR warm interiors, heated dining rooms, and venues known for warm drinks. AVOID open-air venues.")
+        if weather.get("is_hot"):
+            rules.append("It's hot (over 28°C) — FAVOR shaded terraces, air-conditioned basements, and places with cold drinks or helado. AVOID sun-baked rooftops at peak hours.")
+        rules_block = ("\n- " + "\n- ".join(rules)) if rules else ""
+        temp_part = f", {weather.get('temp_c')}°C" if weather.get("temp_c") is not None else ""
+        weather_line = f"\nMadrid weather right now: {weather['condition']}{temp_part}.{rules_block}"
+
     prompt = f"""You are a grizzled pirate navigator helping a crew find their next destination in Madrid, Spain.
 The crew vibe is: {preferences['vibe']}, budget: {preferences['budget']}.
 Chosen chest category: {category}. Sort priority: {sort_mode}.
-Things to avoid: {preferences['avoid']}.{special_line}{day_line}
+Things to avoid: {preferences['avoid']}.{special_line}{day_line}{moment_line}{weather_line}
 From this list of real places, pick the {count} best hidden gems.
 Rules:
 - Avoid chains or franchises (McDonalds, Starbucks, VIPS, etc) unless no other option exists
@@ -388,6 +445,7 @@ def hunt():
     age_group = (data.get("age_group") or "").strip().lower()
     quiet_mode = bool(data.get("quiet_mode", False))
     vibe_intensity = (data.get("vibe_intensity") or "hidden").strip().lower()
+    moment = (data.get("moment") or "").strip().lower()
 
     if not crew_description:
         return jsonify({"error": "No description provided"}), 400
@@ -410,11 +468,14 @@ def hunt():
         return jsonify({"error": "No places found nearby (ZERO_RESULTS) — try a different neighbourhood or vibe"}), 404
     ranked_places = rank_places(places, sort_mode, lat, lng, preferences.get("budget", "medium"))
 
+    weather = fetch_madrid_weather()
+
     base_url = request.host_url.rstrip("/")
     try:
         dossiers = generate_dossiers(
             ranked_places, preferences, category=category, sort_mode=sort_mode,
-            day_of_week=day_of_week, age_group=age_group, quiet_mode=quiet_mode, vibe_intensity=vibe_intensity
+            day_of_week=day_of_week, age_group=age_group, quiet_mode=quiet_mode, vibe_intensity=vibe_intensity,
+            weather=weather, moment=moment,
         )
     except Exception as e:
         err = str(e)
@@ -429,7 +490,8 @@ def hunt():
         try:
             relaxed_dossiers = generate_dossiers(
                 ranked_places, preferences, category=category, sort_mode=sort_mode,
-                day_of_week=day_of_week, age_group=age_group, quiet_mode=False, relaxed=True
+                day_of_week=day_of_week, age_group=age_group, quiet_mode=False, relaxed=True,
+                weather=weather, moment=moment,
             )
             bounties = build_bounties(relaxed_dossiers, ranked_places, base_url)
         except Exception:
@@ -449,7 +511,8 @@ def hunt():
         "bounties": bounties,
         "preferences": preferences,
         "session_key": session_key,
-        "all_place_ids": [p.get("place_id") for p in ranked_places]
+        "all_place_ids": [p.get("place_id") for p in ranked_places],
+        "weather": weather,
     })
 
 @app.route("/api/swap", methods=["POST"])
@@ -594,4 +657,10 @@ def health():
     })
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    # Watch .env files so editing secrets triggers a reload without a manual
+    # restart — otherwise stale env vars silently drop us into FALLBACK_GEMS.
+    extra_watch = [
+        os.path.join(_root, ".env"),
+        os.path.join(os.path.dirname(__file__), ".env"),
+    ]
+    app.run(debug=True, port=5001, extra_files=[p for p in extra_watch if os.path.exists(p)])

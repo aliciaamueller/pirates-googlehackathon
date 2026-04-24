@@ -5,7 +5,8 @@ import { supabase } from "./supabase";
 import {
   BARRIOS, CREW_ROLES, CHEST_OPTIONS, SORT_OPTIONS,
   CLUB_DAY_OPTIONS, CLUB_AGE_OPTIONS, HUNT_STAGES,
-  MADRID_CENTER, VIBE_THEMES, ROUTES_DATA, FAN_FAVOURITES,
+  MADRID_CENTER, VIBE_THEMES,
+  MOMENT_OPTIONS, momentFromHour, momentSceneValue,
 } from "./constants";
 import { BASE_CSS } from "./styles";
 
@@ -24,8 +25,14 @@ import { CrewReactions } from "./components/CrewReactions";
 import { RouteOptimizer } from "./components/RouteOptimizer";
 import { TreasureLog, saveLog } from "./components/TreasureLog";
 import { AuthScreen } from "./components/AuthScreen";
+import { LandingScreen } from "./components/LandingScreen";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { PlansPanel, formatPlanDateTime } from "./components/PlansPanel";
+import { MobileBottomNav } from "./components/MobileBottomNav";
+import { SeaShader } from "./components/SeaShader";
+import { TopBar } from "./components/TopBar";
+import { HomeScene } from "./components/HomeScene";
+import { ExploreScene } from "./components/ExploreScene";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
@@ -71,6 +78,10 @@ function buildMapsRouteUrl(bountiesList) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authView, setAuthView] = useState("landing");
+  const [authInitialMode, setAuthInitialMode] = useState("login");
+  const [tab, setTab] = useState("home"); // "home" | "explore" | "hunt"
+  const [planCount, setPlanCount] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
   const [favoritedIds, setFavoritedIds] = useState(new Set());
@@ -110,6 +121,8 @@ export default function App() {
   const [cuisine, setCuisine] = useState("any");
   const [huntDuration, setHuntDuration] = useState("any");
   const [weather, setWeather] = useState(null);
+  const [huntWeather, setHuntWeather] = useState(null);
+  const [moment, setMoment] = useState(() => momentFromHour(new Date().getHours()));
   const [speaking, setSpeaking] = useState(false);
   const [navigatorChat, setNavigatorChat] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
@@ -133,6 +146,23 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Hydrate favourite + plan counts once the user is known (for HomeScene stats).
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: favs } = await supabase.from("favorites").select("place_id").eq("user_id", user.id);
+        if (!cancelled && favs) setFavoritedIds(new Set(favs.map(f => f.place_id)));
+      } catch { /* non-fatal */ }
+      try {
+        const { data: mem } = await supabase.from("plan_members").select("plan_id").eq("user_id", user.id).eq("status", "accepted");
+        if (!cancelled) setPlanCount(mem?.length || 0);
+      } catch { /* non-fatal */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   async function startHunt(descOverride = null, barrioOverride = undefined) {
     const barrio = barrioOverride !== undefined ? barrioOverride : selectedBarrio;
@@ -211,6 +241,7 @@ export default function App() {
           quiet_mode: quietMode,
           vibe_intensity: vibeIntensity,
           group_size: crewSize,
+          moment: moment,
           day_of_week: effectiveCategory === "clubs" ? (clubDay || new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()) : new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase(),
           age_group: effectiveCategory === "clubs" ? (clubAge || "21-25") : undefined,
         }),
@@ -223,6 +254,7 @@ export default function App() {
       setBounties(data.bounties || []);
       setPrefs(prefs);
       setSession(data.session_key);
+      if (data.weather) setHuntWeather(data.weather);
 
       // Show gold burst reveal animation, then switch to reveal screen
       setShowRevealAnim(true);
@@ -279,8 +311,26 @@ export default function App() {
     setSwapHistory(h => h.slice(1));
   }
 
+  function switchTab(next) {
+    const apply = () => {
+      if (screen !== "brief") {
+        setScreen("brief"); setBounties([]); setPrefs(null);
+        setSession(null); setError(""); setVisible([]); setCopied(false);
+        setSwapping(null); setReactions(null); setRouteInfo(null);
+        setShowRevealAnim(false); setHuntStage(0); setSwapHistory([]);
+      }
+      setTab(next);
+      window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    };
+    if (typeof document !== "undefined" && document.startViewTransition) {
+      document.startViewTransition(apply);
+    } else {
+      apply();
+    }
+  }
+
   function reset() {
-    setScreen("brief"); setBounties([]); setPrefs(null);
+    setScreen("brief"); setTab("home"); setBounties([]); setPrefs(null);
     setSession(null); setError(""); setVisible([]); setCopied(false);
     setSwapping(null); setReactions(null);
     setSelectedCategory("restaurants_bars");
@@ -484,47 +534,70 @@ export default function App() {
   } : {};
 
   if (authLoading) return <div style={{ minHeight: "100vh", background: "#1a1a2e" }} />;
-  if (!user) return <AuthScreen onLogin={setUser} />;
+  if (!user && authView === "landing") {
+    return (
+      <LandingScreen
+        onContinue={(mode = "login") => {
+          setAuthInitialMode(mode === "signup" ? "signup" : "login");
+          setAuthView("auth");
+        }}
+      />
+    );
+  }
+  if (!user) {
+    return (
+      <AuthScreen
+        onLogin={setUser}
+        onBack={() => setAuthView("landing")}
+        initialMode={authInitialMode}
+      />
+    );
+  }
   return (
 
     <>
       <style>{BASE_CSS}</style>
 
-      {/* Navbar always on top */}
-      <nav className="navbar">
-        <div className="nav-brand" onClick={reset}>
-          <svg width="38" height="38" viewBox="0 0 40 40" fill="none">
-            <circle cx="20" cy="20" r="18" stroke="#0F2747" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.4"/>
-            <circle cx="20" cy="20" r="4" fill="#D4A96A"/>
-            <polygon points="20,2 22.5,17 20,20 17.5,17" fill="#0F2747"/>
-            <polygon points="20,38 22.5,23 20,20 17.5,23" fill="#0F2747" opacity="0.4"/>
-            <polygon points="2,20 17,17.5 20,20 17,22.5" fill="#0F2747" opacity="0.4"/>
-            <polygon points="38,20 23,17.5 20,20 23,22.5" fill="#0F2747"/>
-            <circle cx="20" cy="20" r="1.8" fill="#F7F4EE"/>
-          </svg>
-          <div style={{ display:"flex", flexDirection:"column", lineHeight:1 }}>
-            <span className="nav-title">RUMBO</span>
-            <span className="nav-sub">✦ AI Pirate Navigator ✦</span>
-          </div>
-        </div>
-        <ul className="nav-links">
-          <li><a href="#how">How It Works</a></li>
-          <li><a href="#routes">Treasure Routes</a></li>
-          <li><a href="#" onClick={e=>{e.preventDefault();reset();}}>Start Fresh</a></li>
-        </ul>
-        <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-          <button onClick={() => setShowPlans(true)} style={{ display:"flex", alignItems:"center", gap:"6px", background:"rgba(15,39,71,0.08)", border:"1px solid rgba(15,39,71,0.15)", borderRadius:"40px", padding:"0.5rem 1rem", cursor:"pointer", fontSize:"0.82rem", color:"#4a3820", fontWeight:500 }}>
-            🗺️ Plans
-          </button>
-          <button onClick={() => setShowProfile(true)} style={{ display:"flex", alignItems:"center", gap:"6px", background:"rgba(15,39,71,0.08)", border:"1px solid rgba(15,39,71,0.15)", borderRadius:"40px", padding:"0.5rem 1rem", cursor:"pointer", fontSize:"0.82rem", color:"#4a3820", fontWeight:500 }}>
-            🏴‍☠️ {user?.email?.split("@")[0] || "Profile"}
-          </button>
-          <button className="nav-cta" onClick={reset}>Set Sail <span style={{color:"#D4A96A"}}>→</span></button>
-        </div>
-      </nav>
+      {/* Shader sea — lives behind everything, responds to scene.
+          On the hunt tab we pass a fractional 0..2 so the moment-of-day picker
+          morphs the palette without any prompt work. */}
+      <SeaShader scene={
+        screen === "hunting" ? "hunt"
+        : screen === "reveal" ? "explore"
+        : screen === "surprise" ? "hunt"
+        : tab === "explore" ? "explore"
+        : tab === "hunt" ? momentSceneValue(moment)
+        : "home"
+      } />
 
-      {/* ===== BRIEF SCREEN ===== */}
-      {screen === "brief" && (
+      {/* Slim top bar — brand-only, not navigation */}
+      <TopBar
+        user={user}
+        onBrandClick={() => switchTab("home")}
+        onOpenProfile={() => setShowProfile(true)}
+      />
+
+      {/* ===== HOME TAB ===== */}
+      {screen === "brief" && tab === "home" && (
+        <HomeScene
+          user={user}
+          favCount={favoritedIds.size}
+          planCount={planCount}
+          onStartHunt={() => switchTab("hunt")}
+          onOpenExplore={() => switchTab("explore")}
+        />
+      )}
+
+      {/* ===== EXPLORE TAB ===== */}
+      {screen === "brief" && tab === "explore" && (
+        <ExploreScene
+          onHunt={(desc, barrio) => startHunt(desc, barrio)}
+          onStartHunt={() => switchTab("hunt")}
+        />
+      )}
+
+      {/* ===== HUNT TAB (the brief form) ===== */}
+      {screen === "brief" && tab === "hunt" && (
         <div style={{ position: "relative" }}>
           {/* Static hero bg */}
           <div
@@ -668,6 +741,24 @@ export default function App() {
                         </button>
                       </div>
                     )}
+
+                    {/* Moment of the day — drives shader palette + Gemini rhythm */}
+                    <div style={{ marginBottom:"0.85rem" }}>
+                      <span className="chips-label">When is this happening?</span>
+                      <div className="chips-row">
+                        {MOMENT_OPTIONS.map((m) => (
+                          <button
+                            type="button"
+                            key={m.id}
+                            className={`chip ${moment === m.id ? "sel" : ""}`}
+                            onClick={() => setMoment(m.id)}
+                            title={`${m.es} · ${m.hours}`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     {/* Cuisine selector — only for food/both in restaurants_bars */}
                     {selectedCategory === "restaurants_bars" && mealType !== "drinks" && (
@@ -1009,6 +1100,45 @@ export default function App() {
                   <span style={{ fontSize:"0.85rem", color:"rgba(139,105,20,0.5)", flexShrink:0 }}>→</span>
                 </button>
 
+                {/* Weather chip — server-reported Madrid conditions after a hunt.
+                    Gives the user visual confirmation that the picks already
+                    accounted for rain/cold/heat. */}
+                {huntWeather && huntWeather.condition && huntWeather.condition !== "unknown" && (
+                  <div style={{
+                    display:"inline-flex", alignItems:"center", gap:8,
+                    padding:"0.45rem 0.85rem",
+                    marginBottom:"0.6rem",
+                    borderRadius:999,
+                    background:"rgba(15,39,71,0.06)",
+                    border:"1px solid rgba(15,39,71,0.14)",
+                    color:"#0F2747",
+                    fontSize:"0.78rem",
+                    fontWeight:500,
+                    letterSpacing:"0.02em",
+                  }}>
+                    <span style={{ fontSize:"1rem" }}>
+                      {huntWeather.is_rainy ? "☔"
+                        : huntWeather.is_cold ? "🧣"
+                        : huntWeather.is_hot ? "☀️"
+                        : "⛅"}
+                    </span>
+                    <span>
+                      Madrid · {huntWeather.condition}
+                      {typeof huntWeather.temp_c === "number" && (
+                        <> · <strong style={{ color:"#8B6914" }}>{huntWeather.temp_c}°</strong></>
+                      )}
+                    </span>
+                    {(huntWeather.is_rainy || huntWeather.is_cold || huntWeather.is_hot) && (
+                      <span style={{ color:"rgba(15,39,71,0.55)", fontStyle:"italic" }}>
+                        ·&nbsp;
+                        {huntWeather.is_rainy ? "terraces skipped"
+                          : huntWeather.is_cold ? "warm interiors favored"
+                          : "shaded spots favored"}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <button type="button" className="sail-btn-premium" onClick={() => startHunt()} disabled={!canSail}>
                   {getSailLabel()} <span style={{color:"#D4A96A",marginLeft:4}}>→</span>
                 </button>
@@ -1044,81 +1174,14 @@ export default function App() {
             </div>
           </section>
 
-          <section className="how-section" id="how">
-            <div className="how-inner">
-              <h2 className="sec-headline">How RUMBO Works</h2>
-              <p className="sec-sub">Discover hidden places in Madrid in under a minute.</p>
-              <div className="how-cards">
-                {[
-                  {icon:"◆",title:"Pick Your Chest & Crew",text:"Choose a treasure chest for food, culture, or nightlife, then tune neighborhood, crew roles, and how results are ranked."},
-                  {icon:"◆",title:"AI Hunts Hidden Gems",text:"Our pirate navigator searches beyond tourist traps to find places locals actually love."},
-                  {icon:"◆",title:"Claim Your Bounty",text:"Choose your favourite spot and open it in Google Maps. Swap any result you don't love."},
-                ].map(c=>(
-                  <div key={c.title} className="how-card">
-                    <span className="how-icon">{c.icon}</span>
-                    <div className="how-title">{c.title}</div>
-                    <p className="how-text">{c.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <hr className="divider"/>
-
-          {/* Fan Favourites */}
-          <section className="fan-fav-section">
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:"0" }}>
-              <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"rgba(255,80,60,0.08)", border:"1px solid rgba(255,80,60,0.2)", borderRadius:40, padding:"0.3rem 1rem", marginBottom:"0.85rem", fontSize:"0.7rem", letterSpacing:"0.12em", color:"#c0392b", fontWeight:700, textTransform:"uppercase" }}>🔥 Trending in Madrid</div>
-              <h2 className="sec-headline" style={{ marginBottom:"0.4rem" }}>Fan Favourites</h2>
-              <p className="sec-sub">Places that keep blowing up on TikTok and Instagram.</p>
-            </div>
-            <div className="fan-fav-grid">
-              {FAN_FAVOURITES.map(f => (
-                <div key={f.name} className="fan-fav-card">
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <span className="fan-fav-heat">{f.heat}</span>
-                    <span className="fan-fav-platform">{f.platform}</span>
-                  </div>
-                  <div className="fan-fav-name">{f.name}</div>
-                  <div className="fan-fav-barrio">📍 {f.barrio}</div>
-                  <div className="fan-fav-desc">{f.desc}</div>
-                  <div className="fan-fav-tags">
-                    {f.tags.map(t => <span key={t}>{t}</span>)}
-                  </div>
-                  <button className="fan-fav-cta" onClick={() => startHunt(f.huntDesc, BARRIOS.find(b => b.name === f.barrio) || null)}>
-                    Hunt nearby gems →
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <hr className="divider"/>
-
-          <section className="routes-section" id="routes">
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:"2.5rem" }}>
-              <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"rgba(212,169,106,0.1)", border:"1px solid rgba(212,169,106,0.25)", borderRadius:40, padding:"0.3rem 1rem", marginBottom:"0.85rem", fontSize:"0.7rem", letterSpacing:"0.12em", color:"#8B6914", fontWeight:600, textTransform:"uppercase" }}>✦ Quick Sail ✦</div>
-              <h2 className="sec-headline" style={{ marginBottom:"0.5rem" }}>Legendary Voyages of Madrid</h2>
-              <p className="sec-sub">Nine curated routes — click to sail instantly.</p>
-            </div>
-            <div className="routes-grid">
-              {ROUTES_DATA.map((r) => (
-                <div key={r.title} className="voyage-card"
-                  onClick={() => startHunt(r.huntDesc, BARRIOS.find(b => b.name === r.barrio) || null)}>
-                  <div className="voyage-inner">
-                    <span className="voyage-badge">{r.badge}</span>
-                    <span className="voyage-emoji">{r.emoji}</span>
-                    <div className="voyage-title">{r.title}</div>
-                    <div className="voyage-meta">{r.meta}</div>
-                    <div className="voyage-cta">Set Sail →</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <footer className="footer">Made with ⚓ by <strong>Pirates</strong> · RUMBO © 2025 · Google Hackathon</footer>
+          <div className="hunt-back-row">
+            <button type="button" className="hunt-back-btn" onClick={() => switchTab("home")}>
+              ← Back to Home
+            </button>
+            <button type="button" className="hunt-back-btn hunt-back-btn--muted" onClick={() => switchTab("explore")}>
+              Explore trending →
+            </button>
+          </div>
         </div>
       )}
 
@@ -1411,7 +1474,7 @@ export default function App() {
           </div>
 
           {/* Floating Ask the Navigator button */}
-          <div style={{ position:"fixed", bottom:"1.5rem", right:"1.5rem", zIndex:200 }}>
+          <div className="fab-ask-navigator" style={{ position:"fixed", bottom:"1.5rem", right:"1.5rem", zIndex:200 }}>
             <button onClick={() => { setNavigatorChat(true); if (!chatHistory.length) setChatHistory([]); }} style={{
               background: theme?.numberBadgeBg || "#0F2747", color:"white",
               border:"none", borderRadius:"50px", padding:"0.7rem 1.2rem",
@@ -1423,9 +1486,9 @@ export default function App() {
 
           {/* Navigator Chat Modal */}
           {navigatorChat && (
-            <div style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"flex-end", justifyContent:"flex-end", padding:"80px 1.5rem 1.5rem" }}
+            <div className="modal-sheet-root" style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"flex-end", justifyContent:"flex-end", padding:"80px 1.5rem 1.5rem" }}
               onClick={() => setNavigatorChat(false)}>
-              <div style={{ background:"#0F2747", borderRadius:"20px", padding:"1.4rem", width:"100%", maxWidth:"380px", border:"1px solid rgba(212,169,106,0.25)", boxShadow:"0 20px 60px rgba(0,0,0,0.55)", maxHeight:"62vh", display:"flex", flexDirection:"column" }}
+              <div className="modal-sheet" style={{ background:"#0F2747", borderRadius:"20px", padding:"1.4rem", width:"100%", maxWidth:"380px", border:"1px solid rgba(212,169,106,0.25)", boxShadow:"0 20px 60px rgba(0,0,0,0.55)", maxHeight:"62vh", display:"flex", flexDirection:"column" }}
                 onClick={e => e.stopPropagation()}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.85rem" }}>
                   <span style={{ fontFamily:"'Playfair Display',serif", fontSize:"1rem", color:"#F7F4EE" }}>🗺️ The Navigator</span>
@@ -1474,9 +1537,9 @@ export default function App() {
 
       {/* Add to plan modal */}
       {showAddToPlan && (
-        <div style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
+        <div className="modal-sheet-root" style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
           onClick={() => { setShowAddToPlan(false); setAddingBounty(null); }}>
-          <div style={{ background:"#0F2747", borderRadius:"20px", padding:"28px", width:"100%", maxWidth:"380px", border:"1px solid rgba(212,169,106,0.2)", boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}
+          <div className="modal-sheet" style={{ background:"#0F2747", borderRadius:"20px", padding:"28px", width:"100%", maxWidth:"380px", border:"1px solid rgba(212,169,106,0.2)", boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}
             onClick={e=>e.stopPropagation()}>
             <div style={{ fontFamily:"'Playfair Display',serif", fontSize:"18px", color:"#F7F4EE", marginBottom:"4px" }}>Add to Plan</div>
             <div style={{ fontSize:"13px", color:"rgba(212,169,106,0.6)", marginBottom:"20px" }}>"{addingBounty?.pirate_name || addingBounty?.name}"</div>
@@ -1511,6 +1574,17 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <MobileBottomNav
+        tab={tab}
+        screen={screen}
+        showPlans={showPlans}
+        showProfile={showProfile}
+        onHome={() => switchTab("home")}
+        onExplore={() => switchTab("explore")}
+        onOpenPlans={() => setShowPlans(true)}
+        onOpenProfile={() => setShowProfile(true)}
+      />
     </>
   );
 }

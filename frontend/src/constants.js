@@ -75,6 +75,33 @@ export const CHEST_OPTIONS = [
   },
 ];
 
+// ─── MOMENT OF THE DAY ────────────────────────────────────────────
+// Drives both the Gemini prompt and the SeaShader palette. `sceneValue`
+// maps 0..2 onto the shader's uScene uniform (home=0, explore=1, hunt=2)
+// so a "lunch" hunt renders on an open-daylight sea and "late" on a storm.
+export const MOMENT_OPTIONS = [
+  { id: "breakfast", label: "Breakfast",  es: "Desayuno",   hours: "06–11", sceneValue: 0.0 },
+  { id: "lunch",     label: "Lunch",      es: "Comida",     hours: "11–16", sceneValue: 0.4 },
+  { id: "tapas",     label: "Tapas",      es: "Tapeo",      hours: "16–19", sceneValue: 0.8 },
+  { id: "cena",      label: "Dinner",     es: "Cena",       hours: "19–23", sceneValue: 1.2 },
+  { id: "copas",     label: "Drinks",     es: "Copas",      hours: "23–02", sceneValue: 1.7 },
+  { id: "late",      label: "Late night", es: "Madrugada",  hours: "02–06", sceneValue: 2.0 },
+];
+
+export function momentFromHour(h) {
+  if (h < 6)  return "late";
+  if (h < 11) return "breakfast";
+  if (h < 16) return "lunch";
+  if (h < 19) return "tapas";
+  if (h < 23) return "cena";
+  return "copas";
+}
+
+export function momentSceneValue(id) {
+  const m = MOMENT_OPTIONS.find((x) => x.id === id);
+  return m ? m.sceneValue : 1.2;
+}
+
 export const SORT_OPTIONS = [
   { id: "popularity", label: "Most Popular" },
   { id: "price", label: "Best Price" },
