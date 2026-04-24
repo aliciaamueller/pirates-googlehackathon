@@ -16,7 +16,71 @@ CORS(app)
 
 MAPS_KEY = os.getenv("MAPS_API_KEY")
 print(f"[startup] MAPS_KEY loaded: {bool(MAPS_KEY)} | value prefix: {(MAPS_KEY or '')[:8]}")
+if not MAPS_KEY:
+    print("[startup] WARNING: MAPS_API_KEY not set — curated fallback gems will activate automatically")
+if not os.getenv("GEMINI_API_KEY"):
+    print("[startup] WARNING: GEMINI_API_KEY not set — AI dossier generation will fail")
 _cache = {}
+
+# ─── CURATED FALLBACK GEMS ─────────────────────────────────────────
+# Activates automatically when Places API is unavailable (REQUEST_DENIED, quota, network).
+# Structured identically to Places API nearbysearch results so all downstream logic is unaffected.
+FALLBACK_GEMS = {
+    "restaurants_bars": [
+        {"name": "Bodega de la Ardosa", "place_id": "fb_ardosa", "rating": 4.5, "user_ratings_total": 289, "vicinity": "Calle Colón 13, Malasaña, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4236, "lng": -3.7056}}, "photos": []},
+        {"name": "Casa Labra", "place_id": "fb_labra", "rating": 4.4, "user_ratings_total": 312, "vicinity": "Calle Tetuán 12, Sol, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4193, "lng": -3.7003}}, "photos": []},
+        {"name": "Casa Alberto", "place_id": "fb_alberto", "rating": 4.6, "user_ratings_total": 276, "vicinity": "Calle de las Huertas 18, Letras, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4140, "lng": -3.6963}}, "photos": []},
+        {"name": "El Doble", "place_id": "fb_doble", "rating": 4.3, "user_ratings_total": 198, "vicinity": "Calle Silva 25, Malasaña, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4218, "lng": -3.7052}}, "photos": []},
+        {"name": "Taberna Verdejo", "place_id": "fb_verdejo", "rating": 4.2, "user_ratings_total": 167, "vicinity": "Calle Ruiz 11, Malasaña, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4248, "lng": -3.7042}}, "photos": []},
+        {"name": "La Musa Malasaña", "place_id": "fb_musa", "rating": 4.1, "user_ratings_total": 421, "vicinity": "Calle Manuela Malasaña 18, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4258, "lng": -3.7074}}, "photos": []},
+        {"name": "Taberna La Dolores", "place_id": "fb_dolores", "rating": 4.3, "user_ratings_total": 188, "vicinity": "Plaza de Jesús 4, Huertas, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4144, "lng": -3.6952}}, "photos": []},
+        {"name": "El Bonanno", "place_id": "fb_bonanno", "rating": 4.2, "user_ratings_total": 145, "vicinity": "Plaza del Humilladero 4, La Latina, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4121, "lng": -3.7098}}, "photos": []},
+    ],
+    "museums": [
+        {"name": "Museo del Romanticismo", "place_id": "fb_roman", "rating": 4.5, "user_ratings_total": 189, "vicinity": "Calle San Mateo 13, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4271, "lng": -3.6988}}, "photos": []},
+        {"name": "CaixaForum Madrid", "place_id": "fb_caixa", "rating": 4.6, "user_ratings_total": 312, "vicinity": "Paseo del Prado 36, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4084, "lng": -3.6924}}, "photos": []},
+        {"name": "Matadero Madrid", "place_id": "fb_matadero", "rating": 4.4, "user_ratings_total": 287, "vicinity": "Plaza de Legazpi 8, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.3948, "lng": -3.7003}}, "photos": []},
+        {"name": "Real Academia de Bellas Artes de San Fernando", "place_id": "fb_bellas", "rating": 4.4, "user_ratings_total": 203, "vicinity": "Calle de Alcalá 13, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4175, "lng": -3.6990}}, "photos": []},
+        {"name": "Museo del Traje", "place_id": "fb_traje", "rating": 4.3, "user_ratings_total": 156, "vicinity": "Avenida Juan de Herrera 2, Ciudad Universitaria, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4455, "lng": -3.7263}}, "photos": []},
+        {"name": "Museo Lázaro Galdiano", "place_id": "fb_lazaro", "rating": 4.5, "user_ratings_total": 142, "vicinity": "Calle Serrano 122, Salamanca, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4356, "lng": -3.6863}}, "photos": []},
+    ],
+    "clubs": [
+        {"name": "El Junco Jazz Club", "place_id": "fb_junco", "rating": 4.4, "user_ratings_total": 178, "vicinity": "Plaza de Santa Bárbara 10, Chueca, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4278, "lng": -3.6964}}, "photos": []},
+        {"name": "Costello Club", "place_id": "fb_costello", "rating": 4.2, "user_ratings_total": 134, "vicinity": "Calle del Caballero de Gracia 10, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4202, "lng": -3.7010}}, "photos": []},
+        {"name": "Sala Clamores", "place_id": "fb_clamores", "rating": 4.5, "user_ratings_total": 223, "vicinity": "Calle Alburquerque 14, Malasaña, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4297, "lng": -3.7046}}, "photos": []},
+        {"name": "Tupperware Club", "place_id": "fb_tupperware", "rating": 4.1, "user_ratings_total": 112, "vicinity": "Calle Corredera Alta de San Pablo 26, Malasaña, Madrid", "price_level": 1, "geometry": {"location": {"lat": 40.4261, "lng": -3.7055}}, "photos": []},
+        {"name": "Sala But", "place_id": "fb_but", "rating": 4.0, "user_ratings_total": 89, "vicinity": "Calle del Barceló 11, Chueca, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4265, "lng": -3.6975}}, "photos": []},
+        {"name": "El Intruso Bar", "place_id": "fb_intruso", "rating": 4.3, "user_ratings_total": 97, "vicinity": "Calle Augusto Figueroa 3, Chueca, Madrid", "price_level": 2, "geometry": {"location": {"lat": 40.4241, "lng": -3.6991}}, "photos": []},
+    ],
+}
+
+def get_place_details(place_id):
+    if not MAPS_KEY or str(place_id).startswith("fb_"):
+        return {"open_now": None}
+    ck = cache_key("details", place_id)
+    if ck in _cache:
+        return _cache[ck]
+    url = "https://maps.googleapis.com/maps/api/place/details/json"
+    params = {"place_id": place_id, "fields": "opening_hours", "key": MAPS_KEY}
+    try:
+        resp = requests.get(url, params=params, timeout=5)
+        data = resp.json()
+        if data.get("status") == "OK":
+            hours = data.get("result", {}).get("opening_hours", {})
+            result = {"open_now": hours.get("open_now")}
+            _cache[ck] = result
+            return result
+    except Exception as e:
+        print(f"[Places Details] {e}")
+    return {"open_now": None}
+
+def get_fallback_gems(category="restaurants_bars", lat=40.4168, lng=-3.7038):
+    gems = list(FALLBACK_GEMS.get(category, FALLBACK_GEMS["restaurants_bars"]))
+    for g in gems:
+        plat = g["geometry"]["location"]["lat"]
+        plng = g["geometry"]["location"]["lng"]
+        g["_dist"] = math.sqrt((plat - lat) ** 2 + (plng - lng) ** 2)
+    return sorted(gems, key=lambda x: x.get("_dist", 0))
 
 def cache_key(*args):
     raw = json.dumps(args, sort_keys=True)
@@ -161,6 +225,11 @@ def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, da
     ck = cache_key("places", vibe, category, day_norm, round(lat, 3), round(lng, 3))
     if ck in _cache:
         return _cache[ck]
+
+    if not MAPS_KEY:
+        print(f"[Places API] No key — serving curated fallback for category={category}")
+        return get_fallback_gems(category or "restaurants_bars", lat, lng)
+
     category_key = (category or "").strip().lower()
     cfg = CATEGORY_CONFIG.get(category_key)
     place_type = cfg["type"] if cfg else VIBE_TO_TYPE.get(vibe, "bar")
@@ -172,12 +241,27 @@ def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, da
     params = {"location": f"{lat},{lng}", "radius": radius, "type": place_type, "key": MAPS_KEY}
     if keyword:
         params["keyword"] = keyword
-    resp = requests.get(url, params=params, timeout=8)
-    data = resp.json()
+
+    try:
+        resp = requests.get(url, params=params, timeout=8)
+        data = resp.json()
+    except Exception as e:
+        print(f"[Places API] Network error: {e} — serving curated fallback")
+        return get_fallback_gems(category or "restaurants_bars", lat, lng)
+
     status = data.get("status", "UNKNOWN")
     print(f"[Places API] status={status} vibe={vibe} category={category_key or 'auto'} day={day_norm} lat={lat} lng={lng} key_set={bool(MAPS_KEY)}")
+
+    if status in ("REQUEST_DENIED", "INVALID_REQUEST"):
+        err_msg = data.get("error_message", "no details")
+        print(f"[Places API] {status}: {err_msg} — serving curated fallback")
+        fallback = get_fallback_gems(category or "restaurants_bars", lat, lng)
+        _cache[ck] = fallback
+        return fallback
+
     if status not in ("OK", "ZERO_RESULTS"):
         raise Exception(f"Places API error: {status} — {data.get('error_message', '')}")
+
     results = data.get("results", [])[:15]
     if results:
         _cache[ck] = results
@@ -230,6 +314,7 @@ def build_bounties(dossiers, places):
         if match:
             photo_ref = match.get("photos", [{}])[0].get("photo_reference")
             photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=600&photo_reference={photo_ref}&key={MAPS_KEY}" if photo_ref else None
+            details = get_place_details(d.get("place_id"))
             bounties.append({
                 "name": d.get("name"),
                 "pirate_name": d.get("pirate_name"),
@@ -243,6 +328,7 @@ def build_bounties(dossiers, places):
                 "maps_url": f"https://www.google.com/maps/place/?q=place_id:{d.get('place_id')}",
                 "photo_url": photo_url,
                 "price_level": match.get("price_level"),
+                "open_now": details.get("open_now"),
             })
     return bounties
 
@@ -384,7 +470,13 @@ def crew_react():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ship is sailing"})
+    return jsonify({
+        "status": "ship is sailing",
+        "maps_key": bool(MAPS_KEY),
+        "gemini_key": bool(os.getenv("GEMINI_API_KEY")),
+        "fallback_mode": not bool(MAPS_KEY),
+        "cache_entries": len(_cache),
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
