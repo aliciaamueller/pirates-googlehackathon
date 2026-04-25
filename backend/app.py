@@ -263,11 +263,11 @@ def rank_places(places, sort_mode, lat, lng, budget):
 
     return sorted(places, key=score_place, reverse=True)
 
-def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, day_of_week=None):
+def search_places(vibe, lat=40.4168, lng=-3.7038, radius=4000, category=None, day_of_week=None, open_now_only=False):
     day_norm = normalize_day(day_of_week)
-    ck = cache_key("places", vibe, category, day_norm, round(lat, 3), round(lng, 3))
-    if ck in _cache:
-        return _cache[ck]
+    # Randomise search centre slightly across Madrid to avoid always hitting the same pool
+    jitter_lat = lat + random.uniform(-0.018, 0.018)
+    jitter_lng = lng + random.uniform(-0.018, 0.018)
 
     if not MAPS_KEY:
         print(f"[Places API] No key — serving curated fallback for category={category}")
@@ -281,9 +281,11 @@ def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, da
         day_hint = CLUB_DAY_HINTS.get(day_norm, "nightlife madrid")
         keyword = f"{keyword} {day_hint}"
     url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-    params = {"location": f"{lat},{lng}", "radius": radius, "type": place_type, "key": MAPS_KEY}
+    params = {"location": f"{jitter_lat},{jitter_lng}", "radius": radius, "type": place_type, "key": MAPS_KEY}
     if keyword:
         params["keyword"] = keyword
+    if open_now_only:
+        params["opennow"] = "true"
 
     try:
         resp = requests.get(url, params=params, timeout=8)
@@ -298,17 +300,12 @@ def search_places(vibe, lat=40.4168, lng=-3.7038, radius=2500, category=None, da
     if status in ("REQUEST_DENIED", "INVALID_REQUEST"):
         err_msg = data.get("error_message", "no details")
         print(f"[Places API] {status}: {err_msg} — serving curated fallback")
-        fallback = get_fallback_gems(category or "restaurants_bars", lat, lng)
-        _cache[ck] = fallback
-        return fallback
+        return get_fallback_gems(category or "restaurants_bars", lat, lng)
 
     if status not in ("OK", "ZERO_RESULTS"):
         raise Exception(f"Places API error: {status} — {data.get('error_message', '')}")
 
-    results = data.get("results", [])[:20]
-    if results:
-        _cache[ck] = results
-    return results
+    return data.get("results", [])[:20]
 
 def generate_dossiers(places, preferences, exclude_ids=None, count=3, category="auto", sort_mode="popularity", day_of_week=None, age_group=None, quiet_mode=False, vibe_intensity="hidden", relaxed=False, weather=None, moment=None):
     if exclude_ids is None:
@@ -446,6 +443,8 @@ def hunt():
     quiet_mode = bool(data.get("quiet_mode", False))
     vibe_intensity = (data.get("vibe_intensity") or "hidden").strip().lower()
     moment = (data.get("moment") or "").strip().lower()
+    result_count = int(data.get("count", 3))
+    open_now_only = bool(data.get("open_now_only", False))
 
     if not crew_description:
         return jsonify({"error": "No description provided"}), 400
@@ -461,7 +460,7 @@ def hunt():
         preferences["club_day"] = day_of_week
         preferences["age_group"] = age_group
     try:
-        places = search_places(preferences["vibe"], lat, lng, category=category, day_of_week=day_of_week)
+        places = search_places(preferences["vibe"], lat, lng, category=category, day_of_week=day_of_week, open_now_only=open_now_only)
     except Exception as e:
         return jsonify({"error": str(e)}), 502
     if not places:
@@ -475,7 +474,7 @@ def hunt():
         dossiers = generate_dossiers(
             ranked_places, preferences, category=category, sort_mode=sort_mode,
             day_of_week=day_of_week, age_group=age_group, quiet_mode=quiet_mode, vibe_intensity=vibe_intensity,
-            weather=weather, moment=moment,
+            weather=weather, moment=moment, count=result_count,
         )
     except Exception as e:
         err = str(e)
@@ -485,13 +484,13 @@ def hunt():
 
     bounties = build_bounties(dossiers, ranked_places, base_url)
 
-    # If Gemini returned fewer than 3, retry with relaxed constraints
-    if len(bounties) < 3:
+    # If Gemini returned fewer than expected, retry with relaxed constraints
+    if len(bounties) < result_count:
         try:
             relaxed_dossiers = generate_dossiers(
                 ranked_places, preferences, category=category, sort_mode=sort_mode,
                 day_of_week=day_of_week, age_group=age_group, quiet_mode=False, relaxed=True,
-                weather=weather, moment=moment,
+                weather=weather, moment=moment, count=result_count,
             )
             bounties = build_bounties(relaxed_dossiers, ranked_places, base_url)
         except Exception:
@@ -643,6 +642,33 @@ def ask_navigator():
     try:
         answer = call_gemini_with_retry(prompt, temperature=0.7)
         return jsonify({"answer": answer})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/narrate", methods=["POST"])
+def narrate():
+    data = request.json or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        return jsonify({"error": "ElevenLabs not configured", "fallback": True}), 503
+    # "Bill" voice — deep, gravelly, pirate-ish
+    voice_id = "pqHfZKP75CvOlQylNhV4"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
+    payload = {
+        "text": text,
+        "model_id": "eleven_turbo_v2",
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.4},
+    }
+    try:
+        from flask import Response as FlaskResponse
+        resp = requests.post(url, json=payload, headers=headers, timeout=25)
+        if resp.status_code != 200:
+            return jsonify({"error": f"ElevenLabs {resp.status_code}: {resp.text[:200]}"}), 500
+        return FlaskResponse(resp.content, content_type="audio/mpeg", headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "no-store"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

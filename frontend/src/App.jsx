@@ -36,8 +36,21 @@ import { ExploreScene } from "./components/ExploreScene";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
+const MADRID_FACTS = [
+  { icon: "🍽️", text: "Sobrino de Botín has been open since 1725 — the world's oldest restaurant, right here in Madrid." },
+  { icon: "🌙", text: "Madrileños eat dinner at 10pm. Your hunt is timed to local rhythms, Captain." },
+  { icon: "🍺", text: "More bars per capita than anywhere else in Europe. The navigator has options." },
+  { icon: "🎨", text: "More museums per square kilometre than almost any city on earth. Culture runs deep here." },
+  { icon: "🕰️", text: "El Rastro flea market has run every Sunday since the 15th century. Some traditions stick." },
+  { icon: "⛰️", text: "At 667m above sea level, Madrid is the highest capital city in Europe." },
+  { icon: "🌀", text: "La Movida Madrileña — the 80s cultural explosion that turned Madrid into Europe's most creative city." },
+  { icon: "🍸", text: "La Hora del Vermut: a sacred pre-lunch vermouth ritual the locals guard with their lives." },
+  { icon: "🚇", text: "Madrid's metro runs until 1:30am — even the underground knows how to party." },
+  { icon: "🌳", text: "El Retiro park was the private garden of Spanish kings for 200 years." },
+];
+
 /** Crew mode: no free-text box — we synthesize a clear brief for the API from chips + chest */
-function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clubAge, crewSize, mealType, cuisine, huntDuration }) {
+function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clubAge, crewSize, mealType, cuisine, huntDuration, culturalFocus }) {
   const chest = CHEST_OPTIONS.find((c) => c.id === categoryId);
   const chestLine = chest
     ? `Voyage: ${chest.title} — ${chest.subtitle}.`
@@ -48,6 +61,9 @@ function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clu
     if (mealType === "food") parts.push("Looking for restaurants and food spots only — no bars.");
     else if (mealType === "drinks") parts.push("Looking for bars and drink venues only — no restaurants.");
     if (cuisine && cuisine !== "any") parts.push(`Cuisine preference: ${cuisine}.`);
+  }
+  if (categoryId === "museums" && culturalFocus && culturalFocus !== "any") {
+    parts.push(`Cultural focus: ${culturalFocus} — find museums, galleries or cultural spaces specialising in this.`);
   }
   if (barrio?.name) parts.push(`Area focus: ${barrio.name}.`);
   if (roleLabels.length) parts.push(`Crew archetypes: ${roleLabels.join(", ")}.`);
@@ -61,7 +77,7 @@ function buildCrewBrief({ categoryId, barrio, roleLabels, sortMode, clubDay, clu
     const dLabel = huntDuration === "allnight" ? "all night — no time limit, make it memorable" : `${huntDuration} hour${huntDuration !== "1" ? "s" : ""}`;
     parts.push(`Time available: ${dLabel}.`);
   }
-  parts.push("Find three exceptional hidden-gem places in Madrid that fit this brief.");
+  parts.push(`Find three exceptional hidden-gem places in Madrid that fit this brief.`);
   return parts.join(" ");
 }
 
@@ -130,13 +146,23 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [rivalryMode, setRivalryMode] = useState(false);
   const [rivalry2Category, setRivalry2Category] = useState("clubs");
+  const [openNowOnly, setOpenNowOnly] = useState(false);
+  const [culturalFocus, setCulturalFocus] = useState("any");
+  const [crewShareId, setCrewShareId] = useState(null);
+  const [crewVotes, setCrewVotes] = useState({});
+  const [myVotes, setMyVotes] = useState({});
+  const [crewLinkCopied, setCrewLinkCopied] = useState(false);
+  const [huntFactIdx, setHuntFactIdx] = useState(0);
   const photoInputRef = useRef(null);
+  const crewChannelRef = useRef(null);
+  const huntAbortRef = useRef(null);
 
   const currentVibe = preferences?.vibe || null;
   const theme = currentVibe ? VIBE_THEMES[currentVibe] : null;
 
 
   useEffect(() => {
+    if (!supabase) { setAuthLoading(false); return; }
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
@@ -163,6 +189,75 @@ export default function App() {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // Parse crew hunt link on first load
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#hunt=")) return;
+    try {
+      const encoded = hash.slice(6);
+      const { shareId, bounties: loaded } = JSON.parse(decodeURIComponent(atob(encoded)));
+      setBounties(loaded);
+      setCrewShareId(shareId);
+      setTab("hunt");
+      setScreen("reveal");
+      window.history.replaceState(null, "", window.location.pathname);
+      if (supabase && shareId) {
+        const ch = supabase.channel(`rumbo-${shareId}`)
+          .on("broadcast", { event: "vote" }, ({ payload }) => {
+            setCrewVotes(v => {
+              const cur = v[payload.place_id] || { up: 0, down: 0 };
+              const delta = payload.delta ?? 1;
+              const updated = { ...cur, [payload.dir]: Math.max(0, (cur[payload.dir] || 0) + delta) };
+              if (payload.remove_dir) updated[payload.remove_dir] = Math.max(0, (cur[payload.remove_dir] || 0) - 1);
+              return { ...v, [payload.place_id]: updated };
+            });
+          })
+          .subscribe();
+        crewChannelRef.current = ch;
+      }
+    } catch { /* bad link — ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function broadcastVote(placeId, dir) {
+    const currentVote = myVotes[placeId];
+    if (currentVote === dir) {
+      // Toggle off — remove vote
+      setMyVotes(v => ({ ...v, [placeId]: null }));
+      setCrewVotes(v => {
+        const cur = v[placeId] || { up: 0, down: 0 };
+        return { ...v, [placeId]: { ...cur, [dir]: Math.max(0, (cur[dir] || 0) - 1) } };
+      });
+      if (crewChannelRef.current) {
+        await crewChannelRef.current.send({ type: "broadcast", event: "vote", payload: { place_id: placeId, dir, delta: -1 } });
+      }
+    } else {
+      // New vote or flip direction
+      const oldDir = currentVote || null;
+      setMyVotes(v => ({ ...v, [placeId]: dir }));
+      setCrewVotes(v => {
+        const cur = v[placeId] || { up: 0, down: 0 };
+        const next = { ...cur, [dir]: (cur[dir] || 0) + 1 };
+        if (oldDir) next[oldDir] = Math.max(0, (next[oldDir] || 0) - 1);
+        return { ...v, [placeId]: next };
+      });
+      if (crewChannelRef.current) {
+        await crewChannelRef.current.send({ type: "broadcast", event: "vote", payload: { place_id: placeId, dir, delta: 1, remove_dir: oldDir } });
+      }
+    }
+  }
+
+  function copyCrewLink() {
+    if (!crewShareId || !bounties.length) return;
+    const minimal = bounties.map(b => ({
+      place_id: b.place_id, pirate_name: b.pirate_name, hook: b.hook,
+      address: b.address, maps_url: b.maps_url, lat: b.lat, lng: b.lng,
+      photo_url: b.photo_url, rating: b.rating, name: b.name,
+    }));
+    const encoded = btoa(encodeURIComponent(JSON.stringify({ shareId: crewShareId, bounties: minimal })));
+    const url = `${window.location.origin}${window.location.pathname}#hunt=${encoded}`;
+    navigator.clipboard.writeText(url).then(() => { setCrewLinkCopied(true); setTimeout(() => setCrewLinkCopied(false), 2500); });
+  }
 
   async function startHunt(descOverride = null, barrioOverride = undefined) {
     const barrio = barrioOverride !== undefined ? barrioOverride : selectedBarrio;
@@ -207,6 +302,7 @@ export default function App() {
         mealType,
         cuisine,
         huntDuration,
+        culturalFocus,
       });
 
     if (briefInputTab === "capitan" && !String(rawDesc).trim()) {
@@ -219,18 +315,21 @@ export default function App() {
     }
 
     setError(""); setScreen("hunting"); setReactions(null); setHuntStage(0); setRouteInfo(null);
+    setCrewVotes({}); setMyVotes({});
     window.scrollTo({ top: 0, behavior: "smooth" });
 
-    // Advance hunt stages on a timer while API call runs
-    const stageTimers = [1800, 3600, 5400, 7200].map((delay, i) =>
+    // Advance hunt stages visibly — short enough to tick through in a typical 4–8s API round trip
+    const stageTimers = [900, 2000, 3400, 5200].map((delay, i) =>
       setTimeout(() => setHuntStage(i + 1), delay)
     );
 
+    huntAbortRef.current = new AbortController();
     const coords = barrio && !barrio.surprise ? { lat: barrio.lat, lng: barrio.lng } : location || MADRID_CENTER;
     const fullDesc = String(rawDesc).trim();
     try {
       const res = await fetch(`${API}/api/hunt`, {
         method: "POST", headers: { "Content-Type": "application/json" },
+        signal: huntAbortRef.current.signal,
         body: JSON.stringify({
           description: fullDesc,
           lat: coords.lat,
@@ -242,6 +341,8 @@ export default function App() {
           vibe_intensity: vibeIntensity,
           group_size: crewSize,
           moment: moment,
+          count: 3,
+          open_now_only: openNowOnly,
           day_of_week: effectiveCategory === "clubs" ? (clubDay || new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase()) : new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase(),
           age_group: effectiveCategory === "clubs" ? (clubAge || "21-25") : undefined,
         }),
@@ -255,6 +356,25 @@ export default function App() {
       setPrefs(prefs);
       setSession(data.session_key);
       if (data.weather) setHuntWeather(data.weather);
+
+      // Set up live crew sync channel
+      const newShareId = Math.random().toString(36).slice(2, 8).toUpperCase();
+      setCrewShareId(newShareId);
+      if (supabase) {
+        if (crewChannelRef.current) supabase.removeChannel(crewChannelRef.current);
+        const ch = supabase.channel(`rumbo-${newShareId}`)
+          .on("broadcast", { event: "vote" }, ({ payload }) => {
+            setCrewVotes(v => {
+              const cur = v[payload.place_id] || { up: 0, down: 0 };
+              const delta = payload.delta ?? 1;
+              const updated = { ...cur, [payload.dir]: Math.max(0, (cur[payload.dir] || 0) + delta) };
+              if (payload.remove_dir) updated[payload.remove_dir] = Math.max(0, (cur[payload.remove_dir] || 0) - 1);
+              return { ...v, [payload.place_id]: updated };
+            });
+          })
+          .subscribe();
+        crewChannelRef.current = ch;
+      }
 
       // Show gold burst reveal animation, then switch to reveal screen
       setShowRevealAnim(true);
@@ -276,6 +396,7 @@ export default function App() {
 
     } catch (e) {
       stageTimers.forEach(clearTimeout);
+      if (e.name === "AbortError") return; // user went back — silent
       setError(e.message); setScreen("brief");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -438,6 +559,9 @@ export default function App() {
   useEffect(() => {
     if (screen !== "hunting") return;
     setHuntStage(0);
+    setHuntFactIdx(0);
+    const id = setInterval(() => setHuntFactIdx(i => (i + 1) % MADRID_FACTS.length), 3800);
+    return () => clearInterval(id);
   }, [screen]);
 
   useEffect(() => {
@@ -742,23 +866,25 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Moment of the day — drives shader palette + Gemini rhythm */}
-                    <div style={{ marginBottom:"0.85rem" }}>
-                      <span className="chips-label">When is this happening?</span>
-                      <div className="chips-row">
-                        {MOMENT_OPTIONS.map((m) => (
-                          <button
-                            type="button"
-                            key={m.id}
-                            className={`chip ${moment === m.id ? "sel" : ""}`}
-                            onClick={() => setMoment(m.id)}
-                            title={`${m.es} · ${m.hours}`}
-                          >
-                            {m.label}
-                          </button>
-                        ))}
+                    {/* Moment of the day — only for restaurants; clubs/museums get auto-moment */}
+                    {selectedCategory === "restaurants_bars" && (
+                      <div style={{ marginBottom:"0.85rem" }}>
+                        <span className="chips-label">When is this happening?</span>
+                        <div className="chips-row">
+                          {MOMENT_OPTIONS.map((m) => (
+                            <button
+                              type="button"
+                              key={m.id}
+                              className={`chip ${moment === m.id ? "sel" : ""}`}
+                              onClick={() => setMoment(m.id)}
+                              title={`${m.es} · ${m.hours}`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Cuisine selector — only for food/both in restaurants_bars */}
                     {selectedCategory === "restaurants_bars" && mealType !== "drinks" && (
@@ -817,6 +943,24 @@ export default function App() {
                               ))}
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Cultural focus — only for museums */}
+                    {selectedCategory === "museums" && (
+                      <div style={{ marginBottom:"0.85rem", marginTop:"0.85rem" }}>
+                        <span className="chips-label">Cultural focus</span>
+                        <div className="chips-row">
+                          {[
+                            { id:"any", label:"Any" },
+                            { id:"art", label:"Art" },
+                            { id:"history", label:"History" },
+                            { id:"architecture", label:"Architecture" },
+                            { id:"contemporary", label:"Contemporary" },
+                            { id:"science", label:"Science" },
+                          ].map(f => (
+                            <button type="button" key={f.id} className={`chip ${culturalFocus===f.id ? "sel" : ""}`} onClick={() => setCulturalFocus(f.id)}>{f.label}</button>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1058,6 +1202,29 @@ export default function App() {
                   <span style={{ fontSize:"0.72rem", color:"#8a7a5a", marginLeft:2 }}>— prefer places with &lt;150 reviews</span>
                 </div>
 
+                {/* Open Now toggle */}
+                <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", margin:"0.5rem 0 0.5rem", padding:"0.55rem 0.85rem", borderRadius:12, background:"rgba(81,207,102,0.04)", border:"1px solid rgba(81,207,102,0.12)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenNowOnly(o => !o)}
+                    style={{
+                      width:36, height:20, borderRadius:10, border:"none", cursor:"pointer", padding:2,
+                      background: openNowOnly ? "#51cf66" : "#d0c8b8", transition:"background 0.25s", flexShrink:0,
+                      display:"flex", alignItems:"center",
+                    }}
+                    aria-pressed={openNowOnly}
+                    aria-label="Only open right now"
+                  >
+                    <span style={{
+                      width:16, height:16, borderRadius:"50%", background:"white", display:"block",
+                      transform: openNowOnly ? "translateX(16px)" : "translateX(0)",
+                      transition:"transform 0.25s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)",
+                    }}/>
+                  </button>
+                  <span style={{ fontSize:"0.78rem", color:"#4a3820", fontWeight:500 }}>Only open right now</span>
+                  <span style={{ fontSize:"0.72rem", color:"#8a7a5a", marginLeft:2 }}>— live opening hours</span>
+                </div>
+
                 {/* Description preview (Crew mode) */}
                 {briefInputTab === "crew" && (selectedRoles.length > 0 || selectedBarrio) && (
                   <div style={{ fontSize:"0.75rem", color:"#6b5c48", fontStyle:"italic", background:"rgba(212,169,106,0.07)", borderRadius:10, padding:"0.5rem 0.8rem", marginBottom:"0.4rem", border:"1px solid rgba(212,169,106,0.15)", lineHeight:1.5 }}>
@@ -1255,17 +1422,75 @@ export default function App() {
             </svg>
           </div>
           <div className="hunting-wrap">
-            <div style={{textAlign:"center",marginBottom:"0.25rem"}}>
-              <MascotSVG size={120} animation="bounce"/>
+            {/* Ship's wheel */}
+            <div style={{ position:"relative", flexShrink:0 }}>
+              {/* Outer glow ring */}
+              <div style={{ position:"absolute", inset:-12, borderRadius:"50%", background:"radial-gradient(circle, rgba(212,169,106,0.12) 0%, transparent 70%)", animation:"radarPing 3s ease-in-out infinite" }}/>
+              <svg width="190" height="190" viewBox="0 0 190 190"
+                style={{ display:"block", animation:"radarSpin 9s linear infinite", filter:"drop-shadow(0 0 18px rgba(212,169,106,0.35))" }}>
+                {/* Rim */}
+                <circle cx="95" cy="95" r="88" fill="rgba(139,105,20,0.12)" stroke="#C8A84B" strokeWidth="10" strokeOpacity="0.9"/>
+                <circle cx="95" cy="95" r="83" fill="none" stroke="rgba(212,169,106,0.25)" strokeWidth="1"/>
+                {/* 8 spokes + knobs */}
+                {[0,45,90,135,180,225,270,315].map(a => {
+                  const rad = a * Math.PI / 180;
+                  const x2 = 95 + 78 * Math.sin(rad);
+                  const y2 = 95 - 78 * Math.cos(rad);
+                  const kx = 95 + 88 * Math.sin(rad);
+                  const ky = 95 - 88 * Math.cos(rad);
+                  return (
+                    <g key={a}>
+                      <line x1="95" y1="95" x2={x2} y2={y2} stroke="#C8A84B" strokeWidth="8" strokeLinecap="round" strokeOpacity="0.85"/>
+                      <circle cx={kx} cy={ky} r="9" fill="#C8A84B" stroke="#6a4010" strokeWidth="2.5" opacity="0.9"/>
+                    </g>
+                  );
+                })}
+                {/* Hub outer */}
+                <circle cx="95" cy="95" r="28" fill="#C8A84B"/>
+                <circle cx="95" cy="95" r="22" fill="#6a4010"/>
+                <circle cx="95" cy="95" r="18" fill="#4a2a08"/>
+                {/* Anchor in hub */}
+                <text x="95" y="99" textAnchor="middle" fill="rgba(212,169,106,0.8)" fontSize="16" fontFamily="serif">⚓</text>
+              </svg>
             </div>
-            <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"clamp(1.5rem,3vw,2rem)",color:"#F0DFA0",textAlign:"center",marginBottom:"0.3rem"}}>
+
+            <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:"clamp(1.4rem,3vw,1.9rem)",color:"#F0DFA0",textAlign:"center",marginBottom:"0.2rem"}}>
               Scanning the Seas of Madrid…
             </h2>
-            <p style={{color:"rgba(240,223,160,0.45)",fontStyle:"italic",textAlign:"center",marginBottom:"1.75rem",fontSize:"0.88rem"}}>
+            <p style={{color:"rgba(240,223,160,0.45)",fontStyle:"italic",textAlign:"center",marginBottom:"1rem",fontSize:"0.85rem"}}>
               The navigator is charting your course
             </p>
+
+            {/* Rotating Madrid facts — parchment scroll style */}
+            <div key={huntFactIdx} style={{
+              maxWidth:340, margin:"0 auto 1.25rem", padding:"0.9rem 1.2rem 0.85rem",
+              borderRadius:4,
+              background:"linear-gradient(135deg, #2a1f0e 0%, #1e1608 100%)",
+              border:"1px solid rgba(212,169,106,0.3)",
+              borderLeft:"4px solid #C8A84B",
+              boxShadow:"0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(212,169,106,0.1)",
+              animation:"factFade 3.8s ease forwards",
+              position:"relative",
+            }}>
+              <div style={{ position:"absolute", top:8, right:10, fontSize:"0.58rem", color:"rgba(212,169,106,0.35)", fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" }}>
+                Port Gossip
+              </div>
+              <div style={{ display:"flex", alignItems:"flex-start", gap:"0.65rem" }}>
+                <span style={{ fontSize:"1.3rem", flexShrink:0, marginTop:1 }}>{MADRID_FACTS[huntFactIdx].icon}</span>
+                <p style={{ fontSize:"0.8rem", color:"rgba(240,223,160,0.8)", lineHeight:1.6, fontStyle:"italic", fontFamily:"'Crimson Text',serif", margin:0 }}>
+                  {MADRID_FACTS[huntFactIdx].text}
+                </p>
+              </div>
+              {/* Dot indicator */}
+              <div style={{ display:"flex", justifyContent:"center", gap:4, marginTop:"0.6rem" }}>
+                {MADRID_FACTS.map((_, i) => (
+                  <div key={i} style={{ width:4, height:4, borderRadius:"50%", background: i === huntFactIdx ? "#C8A84B" : "rgba(212,169,106,0.2)", transition:"background 0.3s" }}/>
+                ))}
+              </div>
+            </div>
+
             {/* Step checklist */}
-            <div style={{display:"flex",flexDirection:"column",gap:"0.65rem",maxWidth:340,margin:"0 auto 1.75rem"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:"0.55rem",maxWidth:340,margin:"0 auto 1.5rem"}}>
               {HUNT_STAGES.map((stage, i) => {
                 const done = huntStage > i;
                 const active = huntStage === i;
@@ -1300,6 +1525,17 @@ export default function App() {
                 );
               })}
             </div>
+            {/* Back button — lets user abort and fix their brief */}
+            <div style={{ textAlign:"center" }}>
+              <button type="button" onClick={() => { huntAbortRef.current?.abort(); setScreen("brief"); }} style={{
+                background:"transparent", border:"1px solid rgba(240,223,160,0.2)",
+                color:"rgba(240,223,160,0.4)", borderRadius:40, padding:"0.5rem 1.6rem",
+                cursor:"pointer", fontSize:"0.78rem", fontFamily:"'DM Sans',sans-serif",
+                letterSpacing:"0.04em", transition:"all 0.2s",
+              }}>
+                ← Back to search
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1328,7 +1564,9 @@ export default function App() {
                   {theme.icon} {theme.label}
                 </div>
               )}
-              <h1 className="reveal-title" style={{ color: theme?.textPrimary || "white" }}>Three Treasures Found</h1>
+              <h1 className="reveal-title" style={{ color: theme?.textPrimary || "white" }}>
+                {bounties.length === 1 ? "The Treasure Found" : bounties.length === 2 ? "Two Coves Await" : "Three Treasures Found"}
+              </h1>
               {preferences && (
                 <div className="crew-banner" style={{
                   color: theme?.goldColor || "#D4A96A",
@@ -1415,6 +1653,33 @@ export default function App() {
               <RouteOptimizer bounties={bounties} theme={theme}/>
             </div>
 
+            {/* Navigator's Tip — weather-matched drink suggestion */}
+            {huntWeather && huntWeather.condition && huntWeather.condition !== "unknown" && (() => {
+              const tip = huntWeather.is_rainy
+                ? { drink: "vermut caliente", emoji: "🍷", text: "Rain's in — perfect excuse to stay inside with a warm vermut. Ask for it caliente." }
+                : huntWeather.is_cold
+                ? { drink: "chocolate con churros", emoji: "☕", text: "Cold night calls for chocolate con churros before the main event. Captain's orders." }
+                : huntWeather.is_hot
+                ? { drink: "clara con limón", emoji: "🍺", text: "Heat like this? Order a cold clara con limón. Half beer, half lemon — Madrid's cure for summer." }
+                : { drink: "caña y tapa", emoji: "🍺", text: "Perfect evening for a caña and a tapa at the bar. Start slow, finish strong." };
+              return (
+                <div style={{
+                  display:"flex", alignItems:"center", gap:12, marginBottom:"1.25rem",
+                  padding:"0.75rem 1rem", borderRadius:14,
+                  background:"rgba(212,169,106,0.07)",
+                  border:"1px solid rgba(212,169,106,0.22)",
+                }}>
+                  <span style={{ fontSize:"1.6rem", flexShrink:0 }}>{tip.emoji}</span>
+                  <div>
+                    <div style={{ fontSize:"0.65rem", fontWeight:700, letterSpacing:"0.12em", color:"rgba(212,169,106,0.5)", textTransform:"uppercase", marginBottom:3 }}>Navigator's Tip</div>
+                    <div style={{ fontSize:"0.82rem", color: theme?.textPrimary || "rgba(255,255,255,0.85)", lineHeight:1.4 }}>
+                      {tip.text}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Scroll cards */}
             <div style={{ display:"flex", flexDirection:"column", gap:"1.25rem", marginBottom:"2rem" }}>
               {bounties.map((b,i)=>(
@@ -1424,6 +1689,9 @@ export default function App() {
                   onFavorite={user ? handleFavorite : null}
                   isFavorited={favoritedIds.has(b.place_id)}
                   onAddToPlan={user ? openAddToPlan : null}
+                  onVote={crewShareId ? broadcastVote : null}
+                  crewVotes={crewVotes}
+                  myVote={myVotes[b.place_id] || null}
                 />
               ))}
             </div>
@@ -1444,32 +1712,75 @@ export default function App() {
               </div>
             )}
 
-            <div className="bot-actions">
-              <button className="bot-btn" onClick={reset} style={{
-                background:"rgba(255,255,255,0.1)", color: theme?.textPrimary||"white",
-                border:`1px solid ${theme?.cardBorder||"rgba(255,255,255,0.15)"}`,
-              }}>⚓ New Search</button>
-              {typeof window !== "undefined" && window.speechSynthesis && (
-                <button className="bot-btn" onClick={speakBounties} style={{
-                  background: speaking ? "rgba(255,80,60,0.15)" : "rgba(255,255,255,0.1)",
-                  color: speaking ? "#ff9999" : (theme?.textPrimary||"white"),
-                  border:`1px solid ${speaking ? "rgba(255,80,60,0.3)" : (theme?.cardBorder||"rgba(255,255,255,0.15)")}`,
-                }}>{speaking ? "🔇 Stop" : "🔊 Navigator Speaks"}</button>
-              )}
-              <button className="bot-btn" onClick={shareText} style={{
-                background: theme?.numberBadgeBg || "#0F2747", color:"white",
-                opacity: copied ? 0.8 : 1,
-              }}>{copied ? "✓ Copied!" : "📋 Share with crew"}</button>
-              <button className="bot-btn" onClick={()=>setShowShare(true)} style={{
-                background: theme?.goldColor || "#D4A96A", color:"#0F2747",
-              }}>🖼 Share Card</button>
-              {bounties.length > 1 && (
-                <a href={buildMapsRouteUrl(bounties)} target="_blank" rel="noopener noreferrer" className="bot-btn" style={{
-                  background:"rgba(66,133,244,0.18)", color:"#8ab4f8",
-                  border:"1px solid rgba(66,133,244,0.3)", textDecoration:"none",
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-                }}>🗺 Navigate All Stops</a>
-              )}
+            {/* Bottom actions — two rows */}
+            <div style={{ marginBottom:"2rem" }}>
+              {/* Row 1: core actions */}
+              <div style={{ display:"flex", gap:"0.6rem", justifyContent:"center", marginBottom:"0.75rem", flexWrap:"wrap" }}>
+                <button onClick={reset} style={{
+                  padding:"0.7rem 1.4rem", borderRadius:40, fontSize:"0.82rem", fontWeight:600,
+                  background:"rgba(255,255,255,0.08)", color: theme?.textPrimary||"white",
+                  border:`1px solid ${theme?.cardBorder||"rgba(255,255,255,0.15)"}`,
+                  cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
+                }}>⚓ New Search</button>
+
+                {bounties.length > 1 && (
+                  <a href={buildMapsRouteUrl(bounties)} target="_blank" rel="noopener noreferrer" style={{
+                    padding:"0.7rem 1.4rem", borderRadius:40, fontSize:"0.82rem", fontWeight:600,
+                    background:"rgba(66,133,244,0.15)", color:"#8ab4f8",
+                    border:"1px solid rgba(66,133,244,0.28)", textDecoration:"none",
+                    display:"flex", alignItems:"center", gap:6, cursor:"pointer",
+                    fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
+                  }}>🗺 Navigate All Stops</a>
+                )}
+
+                {typeof window !== "undefined" && window.speechSynthesis && (
+                  <button onClick={speakBounties} style={{
+                    padding:"0.7rem 1.4rem", borderRadius:40, fontSize:"0.82rem", fontWeight:600,
+                    background: speaking ? "rgba(255,80,60,0.15)" : "rgba(255,255,255,0.08)",
+                    color: speaking ? "#ff9999" : (theme?.textPrimary||"white"),
+                    border:`1px solid ${speaking ? "rgba(255,80,60,0.3)" : (theme?.cardBorder||"rgba(255,255,255,0.15)")}`,
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
+                  }}>{speaking ? "🔇 Stop" : "🎙 Captain Speaks"}</button>
+                )}
+              </div>
+
+              {/* Row 2: share section */}
+              <div style={{
+                border:`1px solid ${theme?.goldColor ? `${theme.goldColor}30` : "rgba(212,169,106,0.22)"}`,
+                borderRadius:16, padding:"0.85rem 1rem",
+                background:`${theme?.goldColor ? `${theme.goldColor}07` : "rgba(212,169,106,0.04)"}`,
+              }}>
+                <div style={{ fontSize:"0.65rem", fontWeight:700, letterSpacing:"0.12em", color:"rgba(212,169,106,0.5)", textTransform:"uppercase", textAlign:"center", marginBottom:"0.6rem" }}>
+                  Share your treasure
+                </div>
+                <div style={{ display:"flex", gap:"0.5rem", justifyContent:"center", flexWrap:"wrap" }}>
+                  <button onClick={shareText} style={{
+                    flex:1, minWidth:90, padding:"0.65rem 0.75rem", borderRadius:12, fontSize:"0.78rem", fontWeight:600,
+                    background: theme?.numberBadgeBg || "#0F2747", color:"white",
+                    border:"none", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
+                    opacity: copied ? 0.75 : 1,
+                  }}>{copied ? "✓ Copied" : "📋 Copy"}</button>
+
+                  <button onClick={() => setShowShare(true)} style={{
+                    flex:1, minWidth:90, padding:"0.65rem 0.75rem", borderRadius:12, fontSize:"0.78rem", fontWeight:600,
+                    background: theme?.goldColor || "#D4A96A", color:"#0F2747",
+                    border:"none", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
+                  }}>🖼 Story Card</button>
+
+                  <button onClick={copyCrewLink} style={{
+                    flex:1, minWidth:90, padding:"0.65rem 0.75rem", borderRadius:12, fontSize:"0.78rem", fontWeight:600,
+                    background: crewLinkCopied ? "rgba(81,207,102,0.2)" : "rgba(255,255,255,0.08)",
+                    color: crewLinkCopied ? "#51cf66" : (theme?.textPrimary||"white"),
+                    border:`1px solid ${crewLinkCopied ? "rgba(81,207,102,0.4)" : (theme?.cardBorder||"rgba(255,255,255,0.15)")}`,
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
+                  }}>{crewLinkCopied ? "✓ Link Copied!" : "🔗 Crew Link"}</button>
+                </div>
+                {crewShareId && (
+                  <div style={{ textAlign:"center", marginTop:"0.45rem", fontSize:"0.65rem", color:"rgba(212,169,106,0.4)", fontStyle:"italic" }}>
+                    Session #{crewShareId} · Friends click Crew Link to join &amp; vote live
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

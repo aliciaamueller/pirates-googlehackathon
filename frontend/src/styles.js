@@ -518,6 +518,9 @@ export const BASE_CSS = `
   @keyframes revealChestPop { from{opacity:0;transform:scale(0.4) translateY(30px)} to{opacity:1;transform:scale(1) translateY(0)} }
   @keyframes stageSlide { from{opacity:0;transform:translateX(-12px)} to{opacity:1;transform:translateX(0)} }
   @keyframes checkPop { 0%{transform:scale(0)} 60%{transform:scale(1.3)} 100%{transform:scale(1)} }
+  @keyframes radarSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  @keyframes radarPing { 0%{transform:scale(0.85);opacity:0.6} 50%{transform:scale(1.12);opacity:0.15} 100%{transform:scale(0.85);opacity:0.6} }
+  @keyframes factFade { 0%{opacity:0;transform:translateY(6px)} 15%,85%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-6px)} }
   .fu { animation:fadeUp 0.6s ease forwards; opacity:0; }
   .fu1{animation-delay:0.1s} .fu2{animation-delay:0.25s} .fu3{animation-delay:0.4s} .fu4{animation-delay:0.55s}
 

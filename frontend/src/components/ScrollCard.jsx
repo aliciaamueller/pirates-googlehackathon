@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { VIBE_CARD_ANIM } from "../constants";
-import { renderStoryPng } from "./StoryExport";
 
 // ─── CONFIRM SWAP BUTTON ──────────────────────────────────────────
 export function ConfirmSwapButton({ onConfirm, swapping, theme }) {
@@ -37,31 +36,31 @@ function getCrowdLevel(bounty) {
 }
 
 // ─── SCROLL CARD ──────────────────────────────────────────────────
-export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vibe, onAddToPlan, onFavorite, isFavorited }) {
+function useCloseCountdown(closesAt, openNow) {
+  const [minsLeft, setMinsLeft] = useState(null);
+  useEffect(() => {
+    if (!closesAt || !openNow) { setMinsLeft(null); return; }
+    function compute() {
+      const [h, m] = closesAt.split(":").map(Number);
+      const now = new Date();
+      const close = new Date();
+      close.setHours(h, m, 0, 0);
+      if (close <= now) close.setDate(close.getDate() + 1);
+      const mins = Math.floor((close - now) / 60000);
+      setMinsLeft(mins >= 0 && mins <= 45 ? mins : null);
+    }
+    compute();
+    const id = setInterval(compute, 30000);
+    return () => clearInterval(id);
+  }, [closesAt, openNow]);
+  return minsLeft;
+}
+
+export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vibe, onAddToPlan, onFavorite, isFavorited, onVote, crewVotes, myVote }) {
   const t = theme || {};
   const [addMsg, setAddMsg] = useState("");
   const [showEs, setShowEs] = useState(false);
-  const [storyBusy, setStoryBusy] = useState(false);
-
-  async function handleStoryExport() {
-    if (storyBusy) return;
-    setStoryBusy(true);
-    try {
-      const url = await renderStoryPng(bounty);
-      const a = document.createElement("a");
-      const slug = (bounty.place_id || bounty.name || "bounty").toString().replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
-      a.href = url;
-      a.download = `rumbo-${slug}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-    } catch (err) {
-      console.warn("Story export failed", err);
-    } finally {
-      setStoryBusy(false);
-    }
-  }
+  const minsLeft = useCloseCountdown(bounty.closes_at, bounty.open_now);
   const anim = VIBE_CARD_ANIM[vibe] || VIBE_CARD_ANIM.chill;
   const crowd = getCrowdLevel(bounty);
   const streetViewUrl = bounty.lat && bounty.lng ? `https://www.google.com/maps?layer=c&cbll=${bounty.lat},${bounty.lng}` : null;
@@ -179,11 +178,24 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
               <span style={{ fontSize:"0.55rem" }}>●</span>
               {bounty.open_now ? "OPEN NOW" : "CURRENTLY CLOSED"}
             </div>
-            {bounty.closes_at && bounty.open_now && (
+            {bounty.closes_at && bounty.open_now && minsLeft !== null ? (
+              <div style={{
+                display:"inline-flex", alignItems:"center", gap:4,
+                padding:"0.18rem 0.6rem", borderRadius:20,
+                background: minsLeft < 15 ? "rgba(255,60,60,0.18)" : "rgba(252,196,25,0.14)",
+                border: `1px solid ${minsLeft < 15 ? "rgba(255,60,60,0.4)" : "rgba(252,196,25,0.35)"}`,
+                animation: minsLeft < 15 ? "scanPulse 1.4s ease-in-out infinite" : "none",
+              }}>
+                <span style={{ fontSize:"0.7rem" }}>⏰</span>
+                <span style={{ fontSize:"0.72rem", fontWeight:700, color: minsLeft < 15 ? "#ff6b6b" : "#fcc419", letterSpacing:"0.03em" }}>
+                  Closes in {minsLeft} min{minsLeft !== 1 ? "s" : ""}
+                </span>
+              </div>
+            ) : bounty.closes_at && bounty.open_now ? (
               <span style={{ fontSize:"0.72rem", color: t.textMuted || "rgba(255,255,255,0.45)" }}>
                 Closes {bounty.closes_at}
               </span>
-            )}
+            ) : null}
           </div>
         )}
         {/* Crowd meter */}
@@ -227,44 +239,79 @@ export function ScrollCard({ bounty, index, visible, onSwap, swapping, theme, vi
             }}>📅 Reserve</a>
           )}
           {streetViewUrl && (
-            <a href={streetViewUrl} target="_blank" rel="noopener noreferrer" title="Street View" style={{
+            <a href={streetViewUrl} target="_blank" rel="noopener noreferrer" title="Spy via Street View" style={{
               background:"rgba(255,255,255,0.06)", border:`1px solid ${t.cardBorder||"rgba(255,255,255,0.15)"}`,
               color:t.textMuted||"rgba(255,255,255,0.55)", borderRadius:10, padding:"0.75rem 0.7rem",
-              fontSize:"0.8rem", cursor:"pointer", whiteSpace:"nowrap", textDecoration:"none",
+              fontSize:"0.85rem", cursor:"pointer", whiteSpace:"nowrap", textDecoration:"none",
               display:"flex", alignItems:"center", justifyContent:"center",
-            }}>👁</a>
+            }}>🔭</a>
           )}
-          <button
-            type="button"
-            onClick={handleStoryExport}
-            disabled={storyBusy}
-            title="Download Instagram story"
-            aria-label="Download Instagram story"
-            style={{
-              background: storyBusy ? "rgba(212,169,106,0.18)" : "rgba(212,169,106,0.10)",
-              border: `1px solid ${t.goldColor ? `${t.goldColor}55` : "rgba(212,169,106,0.35)"}`,
-              color: t.goldColor || "#D4A96A",
-              borderRadius: 10,
-              padding: "0.75rem 0.7rem",
-              fontSize: "0.9rem",
-              cursor: storyBusy ? "wait" : "pointer",
-              whiteSpace: "nowrap",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "transform 0.15s, background 0.15s",
-            }}
-          >
-            {storyBusy ? (
-              <span style={{ fontSize: "0.75rem", letterSpacing: "0.06em" }}>…</span>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 3v13" />
-                <path d="M6 9l6-6 6 6" />
-                <path d="M5 21h14" />
-              </svg>
-            )}
-          </button>
           <ConfirmSwapButton onConfirm={() => onSwap(bounty.place_id)} swapping={swapping} theme={t} />
         </div>
+
+        {/* Crew vote row */}
+        {onVote && (() => {
+          const votes = crewVotes?.[bounty.place_id] || { up: 0, down: 0 };
+          const total = votes.up + votes.down;
+          const upPct = total > 0 ? Math.round((votes.up / total) * 100) : 50;
+          return (
+            <div style={{ marginTop:"0.85rem", padding:"0.65rem 0.75rem", borderRadius:12, border:"1px solid rgba(212,169,106,0.18)", background:"rgba(212,169,106,0.04)" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"0.5rem" }}>
+                {/* Up count */}
+                <span style={{
+                  minWidth:28, textAlign:"center", fontFamily:"'Playfair Display',serif",
+                  fontSize:"1.3rem", fontWeight:700, color: votes.up > votes.down ? "#51cf66" : "rgba(81,207,102,0.45)",
+                  transition:"all 0.3s",
+                }}>{votes.up}</span>
+
+                <button onClick={() => onVote(bounty.place_id, "up")} style={{
+                  flex:1, padding:"0.45rem 0.5rem", borderRadius:8, fontSize:"1rem",
+                  background: myVote === "up" ? "rgba(81,207,102,0.28)" : "rgba(81,207,102,0.1)",
+                  border:`1px solid ${myVote === "up" ? "rgba(81,207,102,0.85)" : (votes.up > votes.down ? "rgba(81,207,102,0.5)" : "rgba(81,207,102,0.2)")}`,
+                  cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                  transform: myVote === "up" ? "scale(1.04)" : "scale(1)",
+                  boxShadow: myVote === "up" ? "0 0 10px rgba(81,207,102,0.3)" : "none",
+                }}>
+                  👍 <span style={{ fontSize:"0.68rem", color: myVote === "up" ? "#51cf66" : "rgba(81,207,102,0.7)", fontWeight:600 }}>aye</span>
+                </button>
+
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, flexShrink:0 }}>
+                  <span style={{ fontSize:"0.58rem", fontWeight:700, letterSpacing:"0.1em", color:"rgba(212,169,106,0.45)", textTransform:"uppercase" }}>crew</span>
+                  <span style={{ fontSize:"0.58rem", fontWeight:700, letterSpacing:"0.1em", color:"rgba(212,169,106,0.45)", textTransform:"uppercase" }}>vote</span>
+                </div>
+
+                <button onClick={() => onVote(bounty.place_id, "down")} style={{
+                  flex:1, padding:"0.45rem 0.5rem", borderRadius:8, fontSize:"1rem",
+                  background: myVote === "down" ? "rgba(255,107,107,0.22)" : "rgba(255,107,107,0.08)",
+                  border:`1px solid ${myVote === "down" ? "rgba(255,107,107,0.85)" : (votes.down > votes.up ? "rgba(255,107,107,0.5)" : "rgba(255,107,107,0.18)")}`,
+                  cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                  transform: myVote === "down" ? "scale(1.04)" : "scale(1)",
+                  boxShadow: myVote === "down" ? "0 0 10px rgba(255,107,107,0.25)" : "none",
+                }}>
+                  👎 <span style={{ fontSize:"0.68rem", color: myVote === "down" ? "#ff6b6b" : "rgba(255,107,107,0.7)", fontWeight:600 }}>nay</span>
+                </button>
+
+                {/* Down count */}
+                <span style={{
+                  minWidth:28, textAlign:"center", fontFamily:"'Playfair Display',serif",
+                  fontSize:"1.3rem", fontWeight:700, color: votes.down > votes.up ? "#ff8080" : "rgba(255,107,107,0.4)",
+                  transition:"all 0.3s",
+                }}>{votes.down}</span>
+              </div>
+
+              {/* Vote bar */}
+              {total > 0 && (
+                <div style={{ marginTop:"0.45rem", height:4, borderRadius:2, background:"rgba(255,107,107,0.25)", overflow:"hidden" }}>
+                  <div style={{
+                    height:"100%", borderRadius:2,
+                    background:"linear-gradient(90deg, #51cf66, #2fa84f)",
+                    width:`${upPct}%`, transition:"width 0.4s ease",
+                  }}/>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
