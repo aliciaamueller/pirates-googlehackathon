@@ -2,9 +2,19 @@
 
 > *"Skip the tourist traps. Three hidden gems, charted by a pirate, powered by Google."*
 
+---
+
+**To the Google Hackathon judges** 👋
+
+When we got **Pirates** as our theme, we didn't want to just slap an eye patch on a chatbot. We asked ourselves: what does a pirate actually *do*? They ignore the obvious routes, ignore the tourist maps, and find the places nobody else knows about. That's exactly what Madrid deserves — and what no app does well.
+
+RUMBO is our answer. We'd love for you to try it for real tonight: sign up, tell it who your crew is, and let the navigator find you somewhere in Madrid you've never been. We think you'll be surprised.
+
+---
+
 RUMBO is a Google Maps × Gemini AI app that finds three real, non-touristy hidden gems in Madrid for any crew, any vibe, any moment of the night — and makes the discovery feel like an adventure.
 
-Built at the **Google Hackathon Madrid, April 2025**.
+Built at the **Google Hackathon Madrid, April 2025** by **Pirates**.
 
 ---
 
@@ -234,4 +244,4 @@ pirates-googlehackathon/
 
 ## Team
 
-Built by **Ale Pirates** at the Google Hackathon Madrid, April 2025.
+Built by **Alicia Mueller, Alejandro Zapata, Luna Larcher, Hernán Chacón and Alejandro Serrano** at the Google Hackathon Madrid, April 2025.
